@@ -1,13 +1,8 @@
-from src.models.evaluation import EvaluationResult
+from src.models.inputs import EvaluationInput
 
-
-result = EvaluationResult(
-    criterion="accuracy",
-    score=9,
-    
-    reasoning="The answer is factually correct.",
-    issues=[],
-    confidence=0.95,
+evaluation_input = EvaluationInput(
+    question="What is the capital of France?",
+    response="The capital of France is Paris."
 )
 
-print(result)
+print(evaluation_input)

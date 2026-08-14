@@ -1,3 +1,4 @@
 ollama
 pydantic
 python-dotenv
+pytest
