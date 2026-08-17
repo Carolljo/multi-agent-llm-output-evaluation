@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class EvaluationResult(BaseModel):
-    criterion: Literal["accuracy"]
+    criterion: Literal["accuracy", "logic"]
     score: int = Field(ge=1, le=10)
     reasoning: str
     issues: list[str]
