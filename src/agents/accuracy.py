@@ -39,11 +39,30 @@ Provide your confidence from 0.0 to 1.0.
 Scoring guidelines:
 
 10 = Fully factually accurate with no substantive errors.
-8-9 = Highly accurate with only minor factual imprecision.
-6-7 = Mostly accurate with a meaningful but limited factual error.
-4-5 = Partially accurate; contains both correct and incorrect factual claims.
-2-3 = Mostly inaccurate; major factual errors outweigh correct information.
+
+8-9 = Highly accurate with no meaningful factual errors.
+     Only very minor imprecision that does not change the answer
+     to a requested fact may receive this range.
+
+6-7 = Mostly accurate but contains a meaningful factual error,
+     while the main answer remains substantially correct.
+
+4-5 = Partially accurate but contains significant factual errors
+     that materially affect the answer.
+
+2-3 = Mostly inaccurate; the central answer is incorrect or major
+     factual errors substantially outweigh the correct information.
+
 1 = Fundamentally or entirely incorrect.
+
+IMPORTANT:
+If the candidate gives a clearly incorrect answer to the central
+question or to the only fact explicitly requested, the score MUST
+be 3 or lower.
+
+If a response answers multiple explicitly requested facts and one
+major requested fact is incorrect while another is correct, the
+score should normally be 6-7.
 
 Confidence represents how confident you are that your evaluation
 judgment, including the score and identified issues, is correct.
