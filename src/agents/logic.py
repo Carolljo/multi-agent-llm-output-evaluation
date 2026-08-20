@@ -111,6 +111,9 @@ statements, the score MUST be 5 or lower.
 If the candidate response contains multiple severe contradictions or
 fundamentally incoherent reasoning, the score should normally be 1-3.
 
+If the candidate reaches a conclusion by reversing the direction
+of a one-way implication (affirming the consequent), this is a
+significant logical error and the score MUST be 5 or lower.
 CONFIDENCE FORMAT:
 
 The score and confidence are different fields.
