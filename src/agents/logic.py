@@ -114,6 +114,12 @@ fundamentally incoherent reasoning, the score should normally be 1-3.
 If the candidate reaches a conclusion by reversing the direction
 of a one-way implication (affirming the consequent), this is a
 significant logical error and the score MUST be 5 or lower.
+If the candidate's main or final conclusion depends on an invalid
+inference, the score MUST be 5 or lower, even if the rest of the
+reasoning is internally coherent.
+
+Do not classify a central invalid inference as merely a "meaningful
+reasoning weakness" in the 6-7 range.
 CONFIDENCE FORMAT:
 
 The score and confidence are different fields.
