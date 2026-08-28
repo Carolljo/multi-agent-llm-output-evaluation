@@ -3,11 +3,13 @@ from src.models.summary import EvaluationSummary
 
 
 class EvaluatorAggregator:
+    """Combines independent evaluator results into an overall evaluation."""
 
     def aggregate(
         self,
         evaluations: list[EvaluationResult]
     ) -> EvaluationSummary:
+        """Aggregate accuracy, logic, and completeness evaluations."""
 
         accuracy = next(
             evaluation
@@ -21,14 +23,22 @@ class EvaluatorAggregator:
             if evaluation.criterion == "logic"
         )
 
+        completeness = next(
+            evaluation
+            for evaluation in evaluations
+            if evaluation.criterion == "completeness"
+        )
+
         weighted_score = (
-            accuracy.score * 0.5
-            + logic.score * 0.5
+            accuracy.score * 0.40
+            + logic.score * 0.30
+            + completeness.score * 0.30
         )
 
         weakest_score = min(
             accuracy.score,
-            logic.score
+            logic.score,
+            completeness.score
         )
 
         if weakest_score <= 3:
@@ -41,18 +51,21 @@ class EvaluatorAggregator:
             overall_score = weighted_score
 
         overall_confidence = (
-            accuracy.confidence * 0.5
-            + logic.confidence * 0.5
+            accuracy.confidence * 0.40
+            + logic.confidence * 0.30
+            + completeness.confidence * 0.30
         )
 
         key_issues = (
             accuracy.issues
             + logic.issues
+            + completeness.issues
         )
 
         summary = self._build_summary(
             accuracy,
-            logic
+            logic,
+            completeness
         )
 
         return EvaluationSummary(
@@ -68,15 +81,51 @@ class EvaluatorAggregator:
         self,
         accuracy: EvaluationResult,
         logic: EvaluationResult,
+        completeness: EvaluationResult,
     ) -> str:
+        """Build a human-readable summary from the three evaluations."""
 
-        if accuracy.score >= 8 and logic.score >= 8:
-            return "The response is both factually accurate and logically sound."
+        if (
+            accuracy.score >= 8
+            and logic.score >= 8
+            and completeness.score >= 8
+        ):
+            return (
+                "The response is factually accurate, "
+                "logically sound, and complete."
+            )
 
-        if accuracy.score >= 8 and logic.score < 8:
-            return "The response is factually strong but has logical weaknesses."
+        if (
+            accuracy.score >= 8
+            and logic.score >= 8
+            and completeness.score < 8
+        ):
+            return (
+                "The response is factually accurate and logically sound "
+                "but incomplete."
+            )
 
-        if accuracy.score < 8 and logic.score >= 8:
-            return "The response is logically sound but contains factual weaknesses."
+        if (
+            accuracy.score >= 8
+            and logic.score < 8
+            and completeness.score >= 8
+        ):
+            return (
+                "The response is factually accurate and complete "
+                "but has logical weaknesses."
+            )
 
-        return "The response contains both factual and logical weaknesses."
+        if (
+            accuracy.score < 8
+            and logic.score >= 8
+            and completeness.score >= 8
+        ):
+            return (
+                "The response is logically sound and complete "
+                "but contains factual weaknesses."
+            )
+
+        return (
+            "The response has weaknesses in accuracy, logic, "
+            "completeness, or a combination of these dimensions."
+        )
