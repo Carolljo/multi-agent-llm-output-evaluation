@@ -61,6 +61,31 @@ For each important requirement, determine whether the candidate response:
 - Partially addresses it
 - Fails to address it
 
+For every requirement identified from the QUESTION:
+
+1. Look ONLY at the Candidate Response to determine whether
+   that requirement was answered.
+
+2. Do NOT use information appearing only in the Reference Answer
+   as evidence that the Candidate Response answered it.
+
+3. If a requirement has no corresponding answer in the Candidate
+   Response, mark it as MISSING.
+
+4. If the question asks for multiple distinct facts, evaluate each
+   fact separately.
+
+5. The final score MUST reflect any missing major requirement.
+
+Before assigning the score, explicitly verify:
+
+- Requirement 1: addressed / partially addressed / missing
+- Requirement 2: addressed / partially addressed / missing
+- etc.
+
+Do not assign a completeness score of 8 or higher if a major
+explicit requirement is missing from the Candidate Response.
+
 STEP 4 — IGNORE UNREQUESTED INFORMATION
 
 Do not penalize the candidate for omitting additional information that
