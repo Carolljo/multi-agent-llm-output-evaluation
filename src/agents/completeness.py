@@ -9,165 +9,108 @@ class CompletenessEvaluator:
 
     def evaluate(self, evaluation_input: EvaluationInput) -> EvaluationResult:
         prompt = f"""
-You are a strict completeness evaluator.
+You are evaluating ONLY the COMPLETENESS of an answer.
 
-Your task is to evaluate ONLY the completeness of the candidate response.
+Your job is to determine whether the CANDIDATE RESPONSE answers every
+explicit part of the QUESTION.
 
-Determine whether the candidate response adequately addresses all
-important requirements of the question.
-
-Question:
+================ QUESTION ================
 {evaluation_input.question}
 
-Candidate Response:
+============= CANDIDATE RESPONSE ==========
 {evaluation_input.response}
 
-Reference Answer:
+============== REFERENCE ANSWER ===========
 {evaluation_input.reference_answer}
 
-IMPORTANT PRINCIPLE:
-
-Completeness measures whether the candidate answered what the question
-actually asks.
-
-Do NOT require the candidate to include every piece of information
-contained in the reference answer.
-
-Do NOT penalize the candidate for omitting information that was not
-requested by the question.
-
-Do NOT treat verbosity or response length as evidence of completeness.
-
-Follow this evaluation procedure:
-
-STEP 1 — IDENTIFY REQUIREMENTS
-
-Identify the explicit information, questions, tasks, or requirements
-contained in the question.
-
-STEP 2 — DETERMINE EXPECTED COVERAGE
-
-Use the reference answer as supporting context to understand what would
-constitute a valid answer to those requirements.
-
-Do not treat the reference answer as a checklist that must be reproduced
-word-for-word or in its entirety.
-
-STEP 3 — CHECK CANDIDATE COVERAGE
-
-For each important requirement, determine whether the candidate response:
-
-- Fully addresses it
-- Partially addresses it
-- Fails to address it
-
-For every requirement identified from the QUESTION:
-
-1. Look ONLY at the Candidate Response to determine whether
-   that requirement was answered.
-
-2. Do NOT use information appearing only in the Reference Answer
-   as evidence that the Candidate Response answered it.
-
-3. If a requirement has no corresponding answer in the Candidate
-   Response, mark it as MISSING.
-
-4. If the question asks for multiple distinct facts, evaluate each
-   fact separately.
-
-5. The final score MUST reflect any missing major requirement.
-
-Before assigning the score, explicitly verify:
-
-- Requirement 1: addressed / partially addressed / missing
-- Requirement 2: addressed / partially addressed / missing
-- etc.
-
-Do not assign a completeness score of 8 or higher if a major
-explicit requirement is missing from the Candidate Response.
-
-STEP 4 — IGNORE UNREQUESTED INFORMATION
-
-Do not penalize the candidate for omitting additional information that
-appears in the reference answer but was not required by the question.
-
-STEP 5 — DETERMINE THE SCORE
-
-Use this scale:
-
-10 = Fully complete. All important requirements are adequately addressed.
-
-8-9 = Nearly complete. All major requirements are addressed with only
-      minor omissions.
-IMPORTANT SCORING RULE:
-
-If the question contains multiple explicit requirements and the candidate
-completely misses one or more major requirements, the score MUST be 7 or
-lower.
-
-Do not assign 8 or higher when a major explicitly requested component is
-completely missing.
-
-A response that correctly answers only part of a multi-part question is
-not "nearly complete" merely because the answered part is correct.
-
-6-7 = Mostly complete. Most important requirements are addressed, but
-      one meaningful requirement is incomplete or partially addressed.
-
-4-5 = Partially complete. Several important requirements are missing
-      or inadequately addressed.
-
-2-3 = Mostly incomplete. Only a small portion of the requested
-      information is addressed.
-
-1 = Essentially unanswered or fails to address the requested task.
+============================================
 
 IMPORTANT:
 
-A concise response can receive a high completeness score if it fully
-answers the question.
+The three sections above are different.
 
-A long response can receive a low completeness score if it fails to
-address important requirements.
+- QUESTION = what the user asks for.
+- CANDIDATE RESPONSE = what the candidate actually answered.
+- REFERENCE ANSWER = supporting information that helps you understand
+  the expected answer.
 
-Do not confuse factual correctness with completeness.
+NEVER assume that information in the REFERENCE ANSWER appears in the
+CANDIDATE RESPONSE.
 
-The candidate may be factually accurate while still being incomplete.
+ONLY information actually present in the CANDIDATE RESPONSE counts as
+answered.
 
-The criterion field MUST be exactly "completeness".
+EVALUATION PROCEDURE:
 
-The score MUST be an integer from 1 to 10.
+1. Read the QUESTION.
+2. Identify every explicit requirement in the QUESTION.
+3. Check each requirement against the CANDIDATE RESPONSE.
+4. Mark each requirement as:
+   - fully addressed
+   - partially addressed
+   - missing
+5. Use the REFERENCE ANSWER only to clarify what a correct answer to
+   the requirement means.
+6. Do NOT copy information from the REFERENCE ANSWER into the
+   CANDIDATE RESPONSE.
+7. Do NOT assume a requirement was answered just because it appears
+   in the REFERENCE ANSWER.
 
-The reasoning must explain which important requirements were covered,
-partially covered, or missing.
+IMPORTANT MULTI-PART RULE:
 
-The issues list must contain significant missing or incomplete
-requirements.
+If the QUESTION asks for two or more distinct pieces of information
+and the CANDIDATE RESPONSE answers only some of them, the response is
+INCOMPLETE.
 
-If all important requirements are adequately addressed, issues should
-be empty.
+For example:
 
-CONFIDENCE FORMAT:
+QUESTION:
+"What is the capital of France and which river runs through it?"
 
-The confidence field represents how confident you are that your
-completeness evaluation is correct.
+CANDIDATE RESPONSE:
+"Paris is the capital of France."
 
-It does NOT represent how complete the candidate response is.
+REFERENCE ANSWER:
+"Paris is the capital of France, and the Seine runs through the city."
 
-Confidence MUST be a decimal number between 0.0 and 1.0.
+Correct completeness judgment:
+- Capital → fully addressed
+- River → missing
+- Overall response → incomplete
+- Score → 7 or lower
 
-Valid examples:
-0.95
-0.9
-0.75
-0.5
+Do NOT give a score of 8 or higher when a major explicit requirement
+is completely missing.
 
-Invalid examples:
-5
-7
-8
-9
-10
+SCORING:
+
+10 = All important requirements are fully addressed.
+8-9 = All major requirements are addressed with only minor omissions.
+6-7 = Most requirements are addressed, but one meaningful requirement
+      is incomplete or partially addressed.
+4-5 = Several important requirements are missing.
+2-3 = Only a small portion of the requested information is addressed.
+1   = Essentially unanswered.
+
+Do NOT use response length as evidence of completeness.
+
+Do NOT confuse factual correctness with completeness.
+
+A response can be factually correct but incomplete.
+
+OUTPUT REQUIREMENTS:
+
+criterion MUST be exactly "completeness".
+
+score MUST be an integer from 1 to 10.
+
+reasoning MUST explain which explicit requirements were addressed,
+partially addressed, or missing.
+
+issues MUST contain significant missing or incomplete requirements.
+
+confidence MUST be a decimal between 0.0 and 1.0 and represents
+confidence in the evaluation, NOT the completeness score.
 
 Return ONLY the structured evaluation.
 """
