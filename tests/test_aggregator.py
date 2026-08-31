@@ -1,3 +1,5 @@
+from unittest import result
+
 import pytest
 
 from src.aggregation.aggregator import EvaluatorAggregator
@@ -30,7 +32,8 @@ def test_strong_evaluation():
     assert result.needs_adjudication is False
     assert "factually accurate" in result.summary
     assert result.needs_adjudication is False
-
+    assert result.disagreement.has_disagreement is False
+    assert result.disagreement.severity == "none"
 def test_factually_strong_logically_weak():
     accuracy = make_result("accuracy", 9)
     logic = make_result(
@@ -50,7 +53,8 @@ def test_factually_strong_logically_weak():
     assert "logical weaknesses" in result.summary
     assert len(result.key_issues) == 1
     assert result.needs_adjudication is True
-
+    assert result.disagreement.has_disagreement is True
+    assert result.disagreement.severity == "high"
 def test_logically_strong_factually_weak():
     accuracy = make_result(
         "accuracy",

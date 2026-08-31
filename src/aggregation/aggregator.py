@@ -73,13 +73,14 @@ class EvaluatorAggregator:
         )
 
         return EvaluationSummary(
-            evaluations=evaluations,
-            overall_score=overall_score,
-            overall_confidence=overall_confidence,
-            summary=summary,
-            key_issues=key_issues,
-            needs_adjudication=needs_adjudication,
-        )
+    evaluations=evaluations,
+    overall_score=overall_score,
+    overall_confidence=overall_confidence,
+    summary=summary,
+    key_issues=key_issues,
+    needs_adjudication=disagreement.has_disagreement,
+    disagreement=disagreement,
+)
     def _build_summary(
         self,
         accuracy: EvaluationResult,

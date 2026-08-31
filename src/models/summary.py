@@ -1,4 +1,6 @@
 from pydantic import BaseModel, Field
+
+from src.models.disagreement import DisagreementResult
 from src.models.evaluation import EvaluationResult
 
 
@@ -20,3 +22,5 @@ class EvaluationSummary(BaseModel):
     key_issues: list[str]
 
     needs_adjudication: bool
+
+    disagreement: DisagreementResult
