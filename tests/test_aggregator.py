@@ -2,8 +2,8 @@ import pytest
 
 from src.aggregation.aggregator import EvaluatorAggregator
 from src.models.evaluation import EvaluationResult
-
-
+from src.aggregation.disagreement import DisagreementDetector
+aggregator = EvaluatorAggregator(DisagreementDetector())
 def make_result(criterion, score, confidence=0.9, issues=None):
     return EvaluationResult(
         criterion=criterion,
@@ -19,7 +19,7 @@ def test_strong_evaluation():
     logic = make_result("logic", 9)
     completeness = make_result("completeness", 9)
 
-    result = EvaluatorAggregator().aggregate(
+    result = aggregator.aggregate(
         [accuracy, logic, completeness]
     )
 
@@ -29,7 +29,7 @@ def test_strong_evaluation():
     assert result.overall_confidence == pytest.approx(0.9)
     assert result.needs_adjudication is False
     assert "factually accurate" in result.summary
-
+    assert result.needs_adjudication is False
 
 def test_factually_strong_logically_weak():
     accuracy = make_result("accuracy", 9)
@@ -40,7 +40,7 @@ def test_factually_strong_logically_weak():
     )
     completeness = make_result("completeness", 9)
 
-    result = EvaluatorAggregator().aggregate(
+    result = aggregator.aggregate(
         [accuracy, logic, completeness]
     )
 
@@ -49,7 +49,7 @@ def test_factually_strong_logically_weak():
     assert result.overall_score == 5
     assert "logical weaknesses" in result.summary
     assert len(result.key_issues) == 1
-
+    assert result.needs_adjudication is True
 
 def test_logically_strong_factually_weak():
     accuracy = make_result(
@@ -60,7 +60,7 @@ def test_logically_strong_factually_weak():
     logic = make_result("logic", 9)
     completeness = make_result("completeness", 9)
 
-    result = EvaluatorAggregator().aggregate(
+    result = aggregator.aggregate(
         [accuracy, logic, completeness]
     )
 
@@ -68,6 +68,7 @@ def test_logically_strong_factually_weak():
 
     assert result.overall_score == 5
     assert "factual" in result.summary
+    assert result.needs_adjudication is True
 
 
 def test_both_weak():
@@ -83,7 +84,7 @@ def test_both_weak():
     )
     completeness = make_result("completeness", 9)
 
-    result = EvaluatorAggregator().aggregate(
+    result = aggregator.aggregate(
         [accuracy, logic, completeness]
     )
 
@@ -91,7 +92,7 @@ def test_both_weak():
 
     assert result.overall_score == 4.5
     assert len(result.key_issues) == 2
-    
+    assert result.needs_adjudication is True
 def test_completeness_weak():
     accuracy = make_result("accuracy", 9)
     logic = make_result("logic", 9)
@@ -101,7 +102,7 @@ def test_completeness_weak():
         issues=["A major requested requirement is missing."]
     )
 
-    result = EvaluatorAggregator().aggregate(
+    result = aggregator.aggregate(
         [accuracy, logic, completeness]
     )
 
@@ -110,3 +111,4 @@ def test_completeness_weak():
     assert result.overall_score == 5
     assert len(result.key_issues) == 1
     assert "incomplete" in result.summary
+    assert result.needs_adjudication is True

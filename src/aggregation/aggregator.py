@@ -1,10 +1,12 @@
 from src.models.evaluation import EvaluationResult
 from src.models.summary import EvaluationSummary
-
+from src.aggregation.disagreement import DisagreementDetector
 
 class EvaluatorAggregator:
     """Combines independent evaluator results into an overall evaluation."""
 
+    def __init__(self, disagreement_detector: DisagreementDetector):
+        self.disagreement_detector = disagreement_detector
     def aggregate(
         self,
         evaluations: list[EvaluationResult]
@@ -55,7 +57,9 @@ class EvaluatorAggregator:
             + logic.confidence * 0.30
             + completeness.confidence * 0.30
         )
+        disagreement = self.disagreement_detector.detect(evaluations)
 
+        needs_adjudication = disagreement.has_disagreement
         key_issues = (
             accuracy.issues
             + logic.issues
@@ -74,9 +78,8 @@ class EvaluatorAggregator:
             overall_confidence=overall_confidence,
             summary=summary,
             key_issues=key_issues,
-            needs_adjudication=False,
+            needs_adjudication=needs_adjudication,
         )
-
     def _build_summary(
         self,
         accuracy: EvaluationResult,
