@@ -1,8 +1,12 @@
 import requests
 import streamlit as st
 
+import os
 
-API_URL = "http://127.0.0.1:8000"
+API_URL = os.getenv(
+    "API_URL",
+    "http://127.0.0.1:8000",
+).rstrip("/")
 
 st.set_page_config(
     page_title="Multi-Agent Evaluation",
