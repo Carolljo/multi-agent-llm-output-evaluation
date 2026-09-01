@@ -66,3 +66,29 @@ def test_unrequested_reference_information():
     assert result.criterion == "completeness"
     assert result.score >= 8
     assert len(result.issues) == 0
+    
+def test_wrong_but_complete_answer():
+    evaluation_input = EvaluationInput(
+        question=(
+            "If all employees who complete security training receive "
+            "a certificate, and Rahul received a certificate, "
+            "what can we conclude about Rahul?"
+        ),
+        reference_answer=(
+            "We cannot conclude that Rahul completed the training "
+            "solely because he received a certificate."
+        ),
+        response=(
+            "All employees who complete the training receive a certificate. "
+            "Rahul received a certificate. Therefore, Rahul completed "
+            "the training."
+        ),
+    )
+
+    result = evaluator.evaluate(evaluation_input)
+
+    print(result)
+
+    assert result.criterion == "completeness"
+    assert result.score >= 8
+    assert len(result.issues) == 0

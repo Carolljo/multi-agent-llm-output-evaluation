@@ -39,7 +39,53 @@ CANDIDATE RESPONSE.
 
 ONLY information actually present in the CANDIDATE RESPONSE counts as
 answered.
+CRITICAL SEPARATION RULE:
 
+Completeness is NOT correctness.
+
+Your evaluation must ignore whether the candidate's answer is
+factually correct, logically valid, or consistent with the reference
+answer.
+
+A candidate can be completely wrong and still be complete if it
+directly answers every explicit part of the question.
+
+For example:
+
+QUESTION:
+"If P implies Q, and Q is true, what can we conclude about P?"
+
+CANDIDATE RESPONSE:
+"Therefore, P is true."
+
+This candidate response is logically incorrect, but it DOES provide
+a direct conclusion answering the question.
+
+For COMPLETENESS purposes:
+- The conclusion is present.
+- The question has been answered.
+- Therefore, the response is complete.
+
+The logical error must NOT reduce the completeness score.
+The logical error belongs to the LOGIC evaluator.
+
+Similarly, do NOT use the REFERENCE ANSWER to determine whether the
+candidate's conclusion is correct.
+
+Use the reference answer only to understand what the question is
+asking when necessary.
+
+NEVER penalize completeness because:
+- the candidate gives the wrong answer,
+- the candidate uses invalid reasoning,
+- the candidate contradicts the reference answer,
+- the candidate reaches an incorrect conclusion,
+- the candidate contains a factual error.
+
+Those are NOT completeness failures.
+
+Only penalize completeness when requested information is absent,
+partially addressed, or otherwise not answered.
 EVALUATION PROCEDURE:
 
 1. Read the QUESTION.
