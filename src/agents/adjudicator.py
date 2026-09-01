@@ -3,7 +3,7 @@ from src.models.adjudication import AdjudicationResult
 from src.models.disagreement import DisagreementResult
 from src.models.evaluation import EvaluationResult
 from src.models.inputs import EvaluationInput
-
+from pydantic import ValidationError
 
 class Adjudicator:
     def __init__(self, llm_client: LLMClient):
@@ -148,11 +148,44 @@ MANDATORY OVERRIDES:
 Return ONLY the structured evaluation.
 """
         
+        response_format = AdjudicationResult.model_json_schema()
+
         raw_result = self.llm_client.generate(
             prompt=prompt,
-            response_format=AdjudicationResult.model_json_schema(),
+            response_format=response_format,
         )
 
-        adjudication = AdjudicationResult.model_validate_json(raw_result)
+        try:
+            return AdjudicationResult.model_validate_json(raw_result)
 
-        return adjudication
+        except ValidationError:
+            retry_prompt = f"""
+Your previous response was not valid JSON.
+
+You MUST return a complete, valid JSON object that conforms exactly
+to the required schema.
+
+Do not explain anything.
+Do not use Markdown.
+Do not use code fences.
+Do not truncate the response.
+
+Return ONLY the structured JSON evaluation.
+
+Original adjudication task:
+{prompt}
+"""
+
+            retry_result = self.llm_client.generate(
+                prompt=retry_prompt,
+                response_format=response_format,
+            )
+
+            try:
+                return AdjudicationResult.model_validate_json(retry_result)
+
+            except ValidationError as second_error:
+                raise ValueError(
+                    "Adjudicator failed to produce valid structured JSON "
+                    "after one retry."
+                ) from second_error

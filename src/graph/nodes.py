@@ -136,11 +136,43 @@ def finalize_result(state: EvaluationState) -> dict:
             "Evaluation summary is required before finalization."
         )
 
+    evaluations = summary.evaluations
+
+    scores = {
+        evaluation.criterion: evaluation.score
+        for evaluation in evaluations
+    }
+
+    accuracy_score = scores.get("accuracy", 0)
+    logic_score = scores.get("logic", 0)
+    completeness_score = scores.get("completeness", 0)
+
+    if (
+        accuracy_score >= 9
+        and logic_score >= 9
+        and completeness_score >= 9
+    ):
+        verdict = "Correct"
+
+    elif (
+        accuracy_score >= 8
+        and logic_score >= 8
+        and completeness_score >= 8
+    ):
+        verdict = "Mostly Correct"
+
+    elif (
+        accuracy_score < 5
+        or logic_score < 5
+    ):
+        verdict = "Incorrect"
+
+    else:
+        verdict = "Partially Correct"
+
     return {
         "final_result": FinalEvaluationResult(
-            verdict="Correct"
-            if summary.overall_score >= 8
-            else "Partially Correct",
+            verdict=verdict,
             score=summary.overall_score,
             confidence=summary.overall_confidence,
             reasoning=summary.summary,

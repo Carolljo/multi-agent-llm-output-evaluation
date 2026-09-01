@@ -107,7 +107,49 @@ score MUST be an integer from 1 to 10.
 reasoning MUST explain which explicit requirements were addressed,
 partially addressed, or missing.
 
-issues MUST contain significant missing or incomplete requirements.
+issues MUST contain ONLY problems with the CANDIDATE RESPONSE.
+
+An issue is valid ONLY if the candidate response:
+- misses an explicit requirement from the QUESTION,
+- partially addresses an explicit requirement,
+- or fails to provide information explicitly requested by the QUESTION.
+
+NEVER create an issue because:
+- the REFERENCE ANSWER contains additional information,
+- the REFERENCE ANSWER is more detailed than the CANDIDATE RESPONSE,
+- the CANDIDATE RESPONSE does not reproduce every sentence or detail
+  from the REFERENCE ANSWER,
+- the REFERENCE ANSWER contains information that was not requested
+  by the QUESTION.
+
+REFERENCE-ONLY INFORMATION IS NOT A COMPLETENESS ISSUE.
+
+For example:
+
+QUESTION:
+"What is the capital of France?"
+
+CANDIDATE RESPONSE:
+"Paris is the capital of France."
+
+REFERENCE ANSWER:
+"Paris is the capital of France. It lies along the Seine and is a
+major cultural and political center."
+
+Correct output:
+- score = 10
+- issues = []
+
+The Seine information is NOT required because the QUESTION does not
+ask about the Seine.
+
+If the QUESTION explicitly asked:
+"What is the capital of France and which river runs through it?"
+
+then omitting the river would be a valid completeness issue.
+
+If all explicit requirements in the QUESTION are satisfied,
+issues MUST be an empty list.
 
 confidence MUST be a decimal between 0.0 and 1.0 and represents
 confidence in the evaluation, NOT the completeness score.
