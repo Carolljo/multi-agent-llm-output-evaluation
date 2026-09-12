@@ -110,13 +110,17 @@ def test_disagreement():
 def test_adjudication():
     adjudication = Adjudication(
         verdict="partial",
-        score=0.78,
         confidence=0.86,
         reasoning="The grounding evaluator identified one unsupported claim.",
         evidence_refs=["E1", "E2"],
     )
 
-    assert adjudication.score == 0.78
+    assert adjudication.verdict == "partial"
+    assert adjudication.confidence == 0.86
+    assert adjudication.reasoning == (
+        "The grounding evaluator identified one unsupported claim."
+    )
+    assert adjudication.evidence_refs == ["E1", "E2"]
 
 
 def test_final_verdict():
