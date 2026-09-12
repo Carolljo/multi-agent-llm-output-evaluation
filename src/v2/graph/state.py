@@ -1,5 +1,6 @@
 from typing import Optional, TypedDict
 
+from src.v2.aggregation.aggregator import AggregatedEvaluation
 from src.v2.models.schemas import (
     Adjudication,
     Claim,
@@ -37,6 +38,9 @@ class EvaluationState(TypedDict):
 
     # Collected evaluator outputs
     evaluations: list[EvaluatorResult]
+
+    # Deterministic aggregation
+    aggregated: Optional[AggregatedEvaluation]
 
     # Arbitration
     disagreement: Optional[Disagreement]

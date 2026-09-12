@@ -97,9 +97,10 @@ class Disagreement(BaseModel):
 class Adjudication(BaseModel):
     """Final reasoning used to resolve evaluator disagreement."""
 
-    verdict: str
+    model_config = {"extra": "forbid"}
 
-    score: float = Field(ge=0.0, le=1.0)
+    verdict: Literal["accept", "partial", "reject"]
+
     confidence: float = Field(ge=0.0, le=1.0)
 
     reasoning: str

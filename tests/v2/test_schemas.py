@@ -109,7 +109,7 @@ def test_disagreement():
 
 def test_adjudication():
     adjudication = Adjudication(
-        verdict="Mostly correct",
+        verdict="partial",
         score=0.78,
         confidence=0.86,
         reasoning="The grounding evaluator identified one unsupported claim.",
