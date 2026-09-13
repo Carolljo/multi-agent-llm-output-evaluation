@@ -118,7 +118,16 @@ RULES:
                 "LLM returned invalid JSON."
             ) from exc
 
-        return [
-            Claim(**claim)
-            for claim in data.get("claims", [])
-        ]
+        claims = []
+
+        for claim in data.get("claims", []):
+            claim["importance"] = max(
+                0.0,
+                min(1.0, float(claim["importance"])),
+            )
+
+            claims.append(
+                Claim(**claim)
+            )
+
+        return claims
