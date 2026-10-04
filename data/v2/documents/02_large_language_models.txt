@@ -1,0 +1,11 @@
+Large Language Models
+
+Large language models (LLMs) are machine learning models trained on large collections of text. Many modern LLMs use transformer-based neural network architectures. During pretraining, a model learns statistical patterns in text and develops the ability to predict tokens based on surrounding context.
+
+An LLM does not normally retrieve a specific document from its training data when answering a question. Instead, it generates text using patterns represented in its learned parameters and the context supplied at inference time. Additional training techniques can adapt a model to particular tasks or behaviors.
+
+The context provided to an LLM can include the user's question, instructions, previous conversation, retrieved documents, and other application-specific information. The model uses this context when producing its response. The amount of information that can be supplied is constrained by the model's context window.
+
+LLMs are capable of producing fluent and useful responses, but fluency does not guarantee factual correctness. A model can produce statements that sound plausible while being unsupported by available evidence. This behavior is commonly associated with hallucination.
+
+For applications where factual reliability matters, LLM output should therefore be evaluated rather than judged only by how natural or confident the response sounds. External evidence, structured evaluation, and explicit validation can provide additional reliability controls.

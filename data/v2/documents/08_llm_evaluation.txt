@@ -1,0 +1,15 @@
+LLM Output Evaluation
+
+Evaluating an LLM-generated answer involves determining whether the response satisfies the question and whether its claims are reliable. A single score may hide different types of errors, so evaluation can be separated into multiple dimensions.
+
+Accuracy measures whether the claims in a response are factually correct relative to an appropriate reference or evidence. Completeness measures whether important information required to answer the question has been included. Logical consistency examines whether the response is internally coherent and whether its claims conflict with one another.
+
+Evidence grounding examines whether claims are actually supported by the available evidence. A response may be factually plausible while still being ungrounded if the supplied evidence does not support its statements.
+
+Claim-level evaluation can make these dimensions more transparent. A response can be decomposed into individual claims, and each claim can be associated with supporting evidence where available. This makes it possible to identify exactly which parts of an answer are supported or problematic.
+
+Independent evaluators can assess different dimensions separately. Their results can then be aggregated into an overall evaluation. If evaluator scores differ substantially, the system can detect disagreement and invoke an additional adjudication step.
+
+Evidence quality is another useful signal. Retrieved evidence can be assessed using factors such as relevance, source quality, freshness, and consistency. High-quality evidence provides stronger support for grounded evaluation, while weak evidence should reduce confidence in conclusions.
+
+A reliable evaluation system should therefore consider multiple dimensions, explicit evidence, claim-level errors, evaluator confidence, and disagreement rather than relying only on whether an answer sounds convincing.

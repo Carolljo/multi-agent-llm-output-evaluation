@@ -1,0 +1,11 @@
+Text Embeddings
+
+An embedding is a numerical representation of information such as text. An embedding model converts an input text into a vector containing numerical values. Texts with related meanings can often produce vectors that are closer together in an embedding space than texts with unrelated meanings.
+
+Embeddings are commonly used for semantic search and information retrieval. A collection of documents can be divided into chunks, and each chunk can be converted into an embedding. These vectors can then be stored in a vector index. When a user submits a query, the query is embedded using the same or a compatible embedding model. The system compares the query vector with stored document vectors and returns nearby results.
+
+Similarity or distance measures are used to determine which vectors are close to one another. Cosine similarity is one commonly used measure, while some vector databases expose distance values directly. The exact interpretation depends on the embedding model and retrieval system.
+
+Embeddings are useful because semantic retrieval does not require the query and document to contain exactly the same words. However, an embedding similarity score is not proof that a document contains the information required to answer a question. Retrieval results still need to be inspected for relevance and evidentiary support.
+
+Chunk size and chunk boundaries can also affect retrieval quality. Very small chunks may lose context, while very large chunks may contain unrelated information.

@@ -1,0 +1,13 @@
+Machine Learning
+
+Machine learning is a field of computing in which algorithms learn patterns from data and use those patterns to make predictions or decisions. In supervised learning, a model is trained using examples that contain input features and target labels or values. Classification predicts categories, while regression predicts numerical values.
+
+Unsupervised learning works with data without explicitly provided target labels. Examples include clustering and dimensionality reduction. Other learning settings use feedback or interaction to improve a model's behavior.
+
+A machine learning workflow commonly separates data into training, validation, and test sets. The training data is used to fit model parameters. Validation data can be used to select models or tune hyperparameters. A held-out test set provides an estimate of performance on unseen examples.
+
+Overfitting occurs when a model learns patterns that work well on its training data but do not generalize well to new data. Regularization, appropriate model complexity, sufficient data, and careful validation can help reduce overfitting.
+
+Model evaluation should use metrics appropriate to the task. Classification may use accuracy, precision, recall, F1 score, or other measures. Regression may use metrics such as mean absolute error or root mean squared error.
+
+Machine learning systems can also experience distribution shift when the characteristics of new data differ from the training data. Consequently, good performance on a test set does not guarantee reliable behavior in every future environment.

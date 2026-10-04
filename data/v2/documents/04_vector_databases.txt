@@ -1,0 +1,13 @@
+Vector Databases
+
+A vector database is a system designed to store and retrieve numerical vector representations efficiently. In retrieval applications, text documents are commonly divided into chunks, converted into embeddings, and stored together with identifiers and metadata.
+
+A vector search begins with a query embedding. The database compares that vector with stored vectors and returns results according to a similarity or distance measure. Applications commonly request the top-k nearest results, where k specifies how many candidate chunks should be returned.
+
+Vector databases can also store metadata associated with each vector. Metadata may include document identifiers, chunk identifiers, source names, timestamps, or other application-specific attributes. Metadata can support filtering and help an application trace a retrieved result back to its original source.
+
+Approximate nearest-neighbor indexing techniques are often used to make vector search efficient at larger scales. These methods trade some aspects of exact search for faster retrieval.
+
+A vector database does not determine whether retrieved information is true. It performs retrieval according to the representations and search configuration provided to it. A high similarity score means that an item is close according to the selected vector representation and distance function; it does not by itself establish factual correctness.
+
+Reliable retrieval systems therefore combine vector search with appropriate chunking, metadata, source information, and downstream evaluation.

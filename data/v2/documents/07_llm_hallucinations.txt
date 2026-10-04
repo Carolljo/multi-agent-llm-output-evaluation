@@ -1,0 +1,13 @@
+LLM Hallucinations
+
+An LLM hallucination is a generated statement that is unsupported by the available evidence or is factually incorrect. Hallucinated text can sometimes appear fluent, detailed, and confident, which makes it difficult to detect through surface-level inspection alone.
+
+Hallucinations can occur for several reasons. A language model generates text based on learned statistical patterns rather than directly verifying every statement against an authoritative source. Ambiguous questions, missing context, incomplete retrieval, or insufficiently represented information can increase the risk of unsupported generation.
+
+Retrieval-augmented generation can reduce some hallucinations by providing relevant external information to the model. However, retrieval alone does not eliminate the problem. A model may ignore retrieved evidence, misunderstand it, combine unrelated information, or generate claims that are not present in the retrieved material.
+
+One useful mitigation strategy is evidence grounding. Generated claims can be compared with retrieved evidence to determine whether the evidence actually supports them. Claim-level evaluation can distinguish supported, partially supported, and unsupported statements.
+
+Other reliability measures include using clear prompts, providing appropriate context, validating generated references, evaluating multiple dimensions of the response, and escalating cases where evaluators strongly disagree.
+
+The goal of hallucination detection is not simply to identify unusual wording. The important question is whether the claims made by a response are supported by reliable information and whether the response accurately represents that information.

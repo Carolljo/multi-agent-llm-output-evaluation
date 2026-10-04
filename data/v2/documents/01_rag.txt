@@ -1,0 +1,9 @@
+Retrieval-Augmented Generation (RAG)
+
+Retrieval-Augmented Generation is a system design that combines information retrieval with language generation. Instead of asking a language model to answer a question using only information encoded in its parameters, a RAG system first retrieves relevant documents or passages from an external knowledge source. The retrieved information is then supplied to the language model as context for generating the answer.
+
+A typical RAG pipeline contains several stages. Documents are collected and divided into smaller chunks. Each chunk can be converted into an embedding and stored in a vector index. When a user asks a question, the question is embedded and compared with stored representations to retrieve relevant chunks. The retrieved chunks are passed to a language model together with the original question.
+
+RAG can improve factual reliability because the generated response can be grounded in information retrieved from a specified knowledge source. It can also make the information used by the generation process easier to inspect. However, retrieval does not automatically guarantee a correct answer. If the retrieved evidence is irrelevant, incomplete, outdated, or contradictory, the resulting answer can still be unreliable.
+
+The quality of a RAG system therefore depends on both retrieval and generation. Good retrieval should return evidence that is relevant to the question, while generation should use that evidence accurately rather than introducing unsupported information.
