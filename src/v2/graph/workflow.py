@@ -1,5 +1,6 @@
 from langgraph.graph import END, START, StateGraph
 
+from src.v2.evidence.quality import EvidenceQualityScorer
 from src.v2.arbitration.adjudicator import Adjudicator
 from src.v2.claims.extractor import ClaimExtractor
 from src.v2.graph.nodes import (
@@ -60,6 +61,31 @@ def use_memory_evidence_node(
 
     return {
         "evidence": memory_evidence,
+    }
+
+
+def score_evidence_quality_node(
+    state: EvaluationState,
+    scorer: EvidenceQualityScorer,
+):
+    """
+    Score the quality of every evidence item in the shared evidence pool.
+
+    This does not remove evidence. It creates deterministic quality
+    metadata that can be used by later verification and audit logic.
+    """
+
+    evidence = state.get("evidence", [])
+
+    if not evidence:
+        raise ValueError(
+            "Cannot score evidence quality because the evidence pool is empty."
+        )
+
+    quality_scores = scorer.score_many(evidence)
+
+    return {
+        "evidence_quality": quality_scores,
     }
 
 
@@ -138,6 +164,7 @@ def build_autonomous_workflow(
     top_k: int = 5,
     memory_retriever: AnswerMemoryRetriever | None = None,
     memory_decision_policy: MemoryDecisionPolicy | None = None,
+    evidence_quality_scorer: EvidenceQualityScorer | None = None,
 ):
     """
     Build and compile the complete autonomous V2 evaluation workflow.
@@ -149,10 +176,14 @@ def build_autonomous_workflow(
 
     Otherwise, fresh RAG retrieval is performed.
 
-    Both paths converge into the same reference generation,
-    validation, claim evaluation, aggregation, disagreement,
-    adjudication, and finalization pipeline.
+    Both paths converge into the same evidence-quality,
+    reference generation, validation, claim evaluation,
+    aggregation, disagreement, adjudication, and finalization
+    pipeline.
     """
+
+    if evidence_quality_scorer is None:
+        evidence_quality_scorer = EvidenceQualityScorer()
 
     graph = StateGraph(EvaluationState)
 
@@ -186,6 +217,18 @@ def build_autonomous_workflow(
             state,
             retriever,
             top_k=top_k,
+        ),
+    )
+
+    # ---------------------------------------------------------
+    # Evidence quality
+    # ---------------------------------------------------------
+
+    graph.add_node(
+        "score_evidence_quality",
+        lambda state: score_evidence_quality_node(
+            state,
+            evidence_quality_scorer,
         ),
     )
 
@@ -294,7 +337,7 @@ def build_autonomous_workflow(
     )
 
     # =========================================================
-    # START → MEMORY → EVIDENCE
+    # START → MEMORY → EVIDENCE → QUALITY
     # =========================================================
 
     if memory_retriever is not None:
@@ -315,7 +358,7 @@ def build_autonomous_workflow(
 
         graph.add_edge(
             "use_memory_evidence",
-            "generate_reference",
+            "score_evidence_quality",
         )
 
     else:
@@ -331,6 +374,13 @@ def build_autonomous_workflow(
     # Fresh retrieval path
     graph.add_edge(
         "retrieve_evidence",
+        "score_evidence_quality",
+    )
+
+    # Both evidence sources converge at the same
+    # deterministic evidence-quality assessment stage.
+    graph.add_edge(
+        "score_evidence_quality",
         "generate_reference",
     )
 

@@ -14,6 +14,7 @@ from src.v2.models.schemas import (
 )
 from src.v2.memory.decision import MemoryDecision
 from src.v2.memory.schemas import AnswerMemoryMatch
+from src.v2.evidence.quality import EvidenceQuality
 
 
 class EvaluationState(TypedDict):
@@ -36,6 +37,9 @@ class EvaluationState(TypedDict):
 
     # RAG layer
     evidence: list[Evidence]
+    
+    # Evidence quality
+    evidence_quality: list[EvidenceQuality]
 
     # Autonomous reference pipeline
     reference_answer: Optional[ReferenceAnswer]
