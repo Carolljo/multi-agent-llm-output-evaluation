@@ -19,8 +19,48 @@ from src.v2.graph.nodes import (
     validate_reference_node,
 )
 from src.v2.graph.state import EvaluationState
+from src.v2.memory.decision import MemoryDecisionPolicy
+from src.v2.memory.nodes import answer_memory_node
+from src.v2.memory.retriever import AnswerMemoryRetriever
 from src.v2.reference.generator import ReferenceAnswerGenerator
 from src.v2.reference.validator import ReferenceAnswerValidator
+
+
+def route_after_memory(state: EvaluationState) -> str:
+    """
+    Route the workflow based on the verified answer memory decision.
+
+    A strong verified memory match uses stored memory evidence.
+    Otherwise, the workflow performs fresh RAG retrieval.
+    """
+
+    if state.get("memory_hit", False):
+        return "use_memory"
+
+    return "fresh_retrieval"
+
+
+def use_memory_evidence_node(
+    state: EvaluationState,
+):
+    """
+    Move verified memory evidence into the shared evidence pool.
+
+    Memory answers are never treated as automatically correct.
+    Only the stored evidence is passed into the normal V2
+    verification pipeline.
+    """
+
+    memory_evidence = state.get("memory_evidence", [])
+
+    if not memory_evidence:
+        raise ValueError(
+            "Memory hit occurred but no memory evidence was available."
+        )
+
+    return {
+        "evidence": memory_evidence,
+    }
 
 
 def build_arbitration_workflow(
@@ -96,12 +136,50 @@ def build_autonomous_workflow(
     grounding_evaluator,
     adjudicator: Adjudicator,
     top_k: int = 5,
+    memory_retriever: AnswerMemoryRetriever | None = None,
+    memory_decision_policy: MemoryDecisionPolicy | None = None,
 ):
-    """Build and compile the complete autonomous V2 evaluation workflow."""
+    """
+    Build and compile the complete autonomous V2 evaluation workflow.
+
+    The workflow first searches verified answer memory.
+
+    If a sufficiently strong verified memory match exists,
+    its evidence is reused.
+
+    Otherwise, fresh RAG retrieval is performed.
+
+    Both paths converge into the same reference generation,
+    validation, claim evaluation, aggregation, disagreement,
+    adjudication, and finalization pipeline.
+    """
 
     graph = StateGraph(EvaluationState)
 
-    # Evidence retrieval
+    # ---------------------------------------------------------
+    # Memory layer
+    # ---------------------------------------------------------
+
+    if memory_retriever is not None:
+
+        graph.add_node(
+            "answer_memory",
+            lambda state: answer_memory_node(
+                state,
+                memory_retriever=memory_retriever,
+                decision_policy=memory_decision_policy,
+            ),
+        )
+
+        graph.add_node(
+            "use_memory_evidence",
+            use_memory_evidence_node,
+        )
+
+    # ---------------------------------------------------------
+    # Fresh RAG evidence retrieval
+    # ---------------------------------------------------------
+
     graph.add_node(
         "retrieve_evidence",
         lambda state: retrieve_evidence_node(
@@ -111,7 +189,10 @@ def build_autonomous_workflow(
         ),
     )
 
+    # ---------------------------------------------------------
     # Autonomous reference pipeline
+    # ---------------------------------------------------------
+
     graph.add_node(
         "generate_reference",
         lambda state: generate_reference_node(
@@ -128,7 +209,10 @@ def build_autonomous_workflow(
         ),
     )
 
+    # ---------------------------------------------------------
     # Candidate claim extraction
+    # ---------------------------------------------------------
+
     graph.add_node(
         "extract_claims",
         lambda state: extract_claims_node(
@@ -137,7 +221,10 @@ def build_autonomous_workflow(
         ),
     )
 
+    # ---------------------------------------------------------
     # Independent evaluators
+    # ---------------------------------------------------------
+
     graph.add_node(
         "accuracy",
         lambda state: accuracy_node(
@@ -170,13 +257,19 @@ def build_autonomous_workflow(
         ),
     )
 
-    # Synchronization point after parallel evaluation
+    # ---------------------------------------------------------
+    # Synchronization point
+    # ---------------------------------------------------------
+
     graph.add_node(
         "collect_evaluations",
         collect_evaluations_node,
     )
 
+    # ---------------------------------------------------------
     # Arbitration
+    # ---------------------------------------------------------
+
     graph.add_node(
         "aggregate",
         aggregate_node,
@@ -200,16 +293,50 @@ def build_autonomous_workflow(
         finalize_node,
     )
 
-    # Sequential autonomous pipeline
-    graph.add_edge(
-        START,
-        "retrieve_evidence",
-    )
+    # =========================================================
+    # START → MEMORY → EVIDENCE
+    # =========================================================
 
+    if memory_retriever is not None:
+
+        graph.add_edge(
+            START,
+            "answer_memory",
+        )
+
+        graph.add_conditional_edges(
+            "answer_memory",
+            route_after_memory,
+            {
+                "use_memory": "use_memory_evidence",
+                "fresh_retrieval": "retrieve_evidence",
+            },
+        )
+
+        graph.add_edge(
+            "use_memory_evidence",
+            "generate_reference",
+        )
+
+    else:
+
+        # Backward-compatible mode:
+        # if no memory retriever is supplied, use the
+        # original V2 workflow directly.
+        graph.add_edge(
+            START,
+            "retrieve_evidence",
+        )
+
+    # Fresh retrieval path
     graph.add_edge(
         "retrieve_evidence",
         "generate_reference",
     )
+
+    # =========================================================
+    # EXISTING V2 PIPELINE
+    # =========================================================
 
     graph.add_edge(
         "generate_reference",

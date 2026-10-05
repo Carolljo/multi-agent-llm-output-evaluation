@@ -12,6 +12,8 @@ from src.v2.models.schemas import (
     ReferenceAnswer,
     ReferenceValidation,
 )
+from src.v2.memory.decision import MemoryDecision
+from src.v2.memory.schemas import AnswerMemoryMatch
 
 
 class EvaluationState(TypedDict):
@@ -19,6 +21,18 @@ class EvaluationState(TypedDict):
 
     # Initial input
     evaluation_input: EvaluationInput
+
+    # Verified answer memory
+    memory_matches: list[AnswerMemoryMatch]
+    memory_hit: bool
+    memory_decision: Optional[MemoryDecision]
+    memory_decision_reason: Optional[str]
+    memory_similarity: Optional[float]
+    memory_validation_score: Optional[float]
+    memory_validation_confidence: Optional[float]
+    memory_decision_score: Optional[float]
+    memory_answer: Optional[str]
+    memory_evidence: list[Evidence]
 
     # RAG layer
     evidence: list[Evidence]
