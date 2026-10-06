@@ -21,8 +21,14 @@ from src.v2.graph.nodes import (
 )
 from src.v2.graph.state import EvaluationState
 from src.v2.memory.decision import MemoryDecisionPolicy
-from src.v2.memory.nodes import answer_memory_node
+from src.v2.memory.nodes import (
+    answer_memory_node,
+    use_memory_reference_node,
+    write_verified_answer_node,
+)
 from src.v2.memory.retriever import AnswerMemoryRetriever
+from src.v2.memory.store import ChromaAnswerMemory
+from src.v2.memory.write_policy import MemoryWritePolicy
 from src.v2.reference.generator import ReferenceAnswerGenerator
 from src.v2.reference.validator import ReferenceAnswerValidator
 
@@ -31,7 +37,8 @@ def route_after_memory(state: EvaluationState) -> str:
     """
     Route the workflow based on the verified answer memory decision.
 
-    A strong verified memory match uses stored memory evidence.
+    A strong verified memory match reuses the stored reference answer.
+
     Otherwise, the workflow performs fresh RAG retrieval.
     """
 
@@ -47,9 +54,8 @@ def use_memory_evidence_node(
     """
     Move verified memory evidence into the shared evidence pool.
 
-    Memory answers are never treated as automatically correct.
-    Only the stored evidence is passed into the normal V2
-    verification pipeline.
+    This allows the memory-hit path to use the same evidence-quality
+    scoring stage as the fresh retrieval path.
     """
 
     memory_evidence = state.get("memory_evidence", [])
@@ -71,8 +77,7 @@ def score_evidence_quality_node(
     """
     Score the quality of every evidence item in the shared evidence pool.
 
-    This does not remove evidence. It creates deterministic quality
-    metadata that can be used by later verification and audit logic.
+    This stage is deterministic and does not call an LLM.
     """
 
     evidence = state.get("evidence", [])
@@ -164,22 +169,27 @@ def build_autonomous_workflow(
     top_k: int = 5,
     memory_retriever: AnswerMemoryRetriever | None = None,
     memory_decision_policy: MemoryDecisionPolicy | None = None,
+    memory_store: ChromaAnswerMemory | None = None,
+    memory_write_policy: MemoryWritePolicy | None = None,
     evidence_quality_scorer: EvidenceQualityScorer | None = None,
 ):
     """
     Build and compile the complete autonomous V2 evaluation workflow.
 
-    The workflow first searches verified answer memory.
+    MEMORY HIT:
+        Reuse a previously verified reference answer and its evidence.
+        Skip fresh RAG retrieval, reference generation, and reference
+        validation.
 
-    If a sufficiently strong verified memory match exists,
-    its evidence is reused.
+    MEMORY MISS:
+        Perform fresh RAG retrieval, generate a reference answer,
+        independently validate it, and continue through the normal
+        evaluation pipeline.
 
-    Otherwise, fresh RAG retrieval is performed.
+    Both paths converge at candidate claim extraction and evaluation.
 
-    Both paths converge into the same evidence-quality,
-    reference generation, validation, claim evaluation,
-    aggregation, disagreement, adjudication, and finalization
-    pipeline.
+    Freshly verified answers may be persisted into answer memory
+    according to the conservative memory write policy.
     """
 
     if evidence_quality_scorer is None:
@@ -187,9 +197,9 @@ def build_autonomous_workflow(
 
     graph = StateGraph(EvaluationState)
 
-    # ---------------------------------------------------------
-    # Memory layer
-    # ---------------------------------------------------------
+    # =========================================================
+    # MEMORY LAYER
+    # =========================================================
 
     if memory_retriever is not None:
 
@@ -207,9 +217,14 @@ def build_autonomous_workflow(
             use_memory_evidence_node,
         )
 
-    # ---------------------------------------------------------
-    # Fresh RAG evidence retrieval
-    # ---------------------------------------------------------
+        graph.add_node(
+            "use_memory_reference",
+            use_memory_reference_node,
+        )
+
+    # =========================================================
+    # FRESH RAG EVIDENCE RETRIEVAL
+    # =========================================================
 
     graph.add_node(
         "retrieve_evidence",
@@ -220,9 +235,9 @@ def build_autonomous_workflow(
         ),
     )
 
-    # ---------------------------------------------------------
-    # Evidence quality
-    # ---------------------------------------------------------
+    # =========================================================
+    # EVIDENCE QUALITY
+    # =========================================================
 
     graph.add_node(
         "score_evidence_quality",
@@ -232,9 +247,9 @@ def build_autonomous_workflow(
         ),
     )
 
-    # ---------------------------------------------------------
-    # Autonomous reference pipeline
-    # ---------------------------------------------------------
+    # =========================================================
+    # AUTONOMOUS REFERENCE PIPELINE
+    # =========================================================
 
     graph.add_node(
         "generate_reference",
@@ -252,9 +267,9 @@ def build_autonomous_workflow(
         ),
     )
 
-    # ---------------------------------------------------------
-    # Candidate claim extraction
-    # ---------------------------------------------------------
+    # =========================================================
+    # CANDIDATE CLAIM EXTRACTION
+    # =========================================================
 
     graph.add_node(
         "extract_claims",
@@ -264,9 +279,9 @@ def build_autonomous_workflow(
         ),
     )
 
-    # ---------------------------------------------------------
-    # Independent evaluators
-    # ---------------------------------------------------------
+    # =========================================================
+    # INDEPENDENT EVALUATORS
+    # =========================================================
 
     graph.add_node(
         "accuracy",
@@ -300,18 +315,18 @@ def build_autonomous_workflow(
         ),
     )
 
-    # ---------------------------------------------------------
-    # Synchronization point
-    # ---------------------------------------------------------
+    # =========================================================
+    # SYNCHRONIZATION POINT
+    # =========================================================
 
     graph.add_node(
         "collect_evaluations",
         collect_evaluations_node,
     )
 
-    # ---------------------------------------------------------
-    # Arbitration
-    # ---------------------------------------------------------
+    # =========================================================
+    # ARBITRATION
+    # =========================================================
 
     graph.add_node(
         "aggregate",
@@ -337,7 +352,22 @@ def build_autonomous_workflow(
     )
 
     # =========================================================
-    # START → MEMORY → EVIDENCE → QUALITY
+    # MEMORY WRITE
+    # =========================================================
+
+    if memory_store is not None:
+
+        graph.add_node(
+            "write_verified_answer",
+            lambda state: write_verified_answer_node(
+                state,
+                memory_store=memory_store,
+                write_policy=memory_write_policy,
+            ),
+        )
+
+    # =========================================================
+    # START → MEMORY
     # =========================================================
 
     if memory_retriever is not None:
@@ -356,38 +386,69 @@ def build_autonomous_workflow(
             },
         )
 
+        # -----------------------------------------------------
+        # MEMORY HIT PATH
+        # -----------------------------------------------------
+        #
+        # Verified memory evidence is first moved into the
+        # shared evidence pool.
+        #
+        # Then evidence quality is scored.
+        #
+        # Then the verified memory reference answer is reused.
+        #
+        # This ordering keeps the memory path structurally
+        # compatible with the fresh evidence path.
+        # -----------------------------------------------------
+
         graph.add_edge(
             "use_memory_evidence",
             "score_evidence_quality",
         )
 
+        graph.add_conditional_edges(
+            "score_evidence_quality",
+            route_after_memory,
+            {
+                "use_memory": "use_memory_reference",
+                "fresh_retrieval": "generate_reference",
+            },
+        )
+
+        graph.add_edge(
+            "use_memory_reference",
+            "extract_claims",
+        )
+
     else:
 
-        # Backward-compatible mode:
-        # if no memory retriever is supplied, use the
-        # original V2 workflow directly.
+        # -----------------------------------------------------
+        # BACKWARD-COMPATIBLE MODE
+        # -----------------------------------------------------
+        #
+        # If memory is not configured, preserve the original
+        # V2 workflow.
+        # -----------------------------------------------------
+
         graph.add_edge(
             START,
             "retrieve_evidence",
         )
 
-    # Fresh retrieval path
+    # =========================================================
+    # FRESH RETRIEVAL PATH
+    # =========================================================
+
     graph.add_edge(
         "retrieve_evidence",
         "score_evidence_quality",
     )
 
-    # Both evidence sources converge at the same
-    # deterministic evidence-quality assessment stage.
     graph.add_edge(
         "score_evidence_quality",
         "generate_reference",
     )
 
-    # =========================================================
-    # EXISTING V2 PIPELINE
-    # =========================================================
-
     graph.add_edge(
         "generate_reference",
         "validate_reference",
@@ -398,7 +459,10 @@ def build_autonomous_workflow(
         "extract_claims",
     )
 
-    # Fan out to four independent evaluators
+    # =========================================================
+    # COMMON CANDIDATE EVALUATION PIPELINE
+    # =========================================================
+
     graph.add_edge(
         "extract_claims",
         "accuracy",
@@ -419,7 +483,10 @@ def build_autonomous_workflow(
         "grounding",
     )
 
-    # Fan in
+    # =========================================================
+    # EVALUATOR FAN-IN
+    # =========================================================
+
     graph.add_edge(
         "accuracy",
         "collect_evaluations",
@@ -439,6 +506,10 @@ def build_autonomous_workflow(
         "grounding",
         "collect_evaluations",
     )
+
+    # =========================================================
+    # ARBITRATION
+    # =========================================================
 
     graph.add_edge(
         "collect_evaluations",
@@ -464,9 +535,35 @@ def build_autonomous_workflow(
         "finalize",
     )
 
-    graph.add_edge(
-        "finalize",
-        END,
-    )
+    # =========================================================
+    # FINALIZATION + MEMORY WRITE
+    # =========================================================
+
+    if memory_store is not None:
+
+        graph.add_conditional_edges(
+            "finalize",
+            lambda state: (
+                "write_memory"
+                if not state.get("memory_hit", False)
+                else "end"
+            ),
+            {
+                "write_memory": "write_verified_answer",
+                "end": END,
+            },
+        )
+
+        graph.add_edge(
+            "write_verified_answer",
+            END,
+        )
+
+    else:
+
+        graph.add_edge(
+            "finalize",
+            END,
+        )
 
     return graph.compile()

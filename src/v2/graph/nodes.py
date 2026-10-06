@@ -342,3 +342,25 @@ def finalize_node(state: EvaluationState) -> dict:
             evidence_refs=evidence_refs,
         )
     }
+    
+def route_after_answer_memory(state: EvaluationState) -> str:
+    """
+    Backward-compatible memory routing helper.
+
+    Older V2 tests and callers expect the legacy route names:
+        memory_hit
+        memory_miss
+
+    The redesigned autonomous workflow uses route_after_memory()
+    in workflow.py with the new route names:
+        use_memory
+        fresh_retrieval
+
+    This compatibility function is intentionally kept separate so
+    the redesigned workflow does not need to change its routing API.
+    """
+
+    if state.get("memory_hit", False):
+        return "memory_hit"
+
+    return "memory_miss"

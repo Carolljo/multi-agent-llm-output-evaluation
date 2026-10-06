@@ -2,6 +2,8 @@ from typing import Any
 
 from src.v2.memory.decision import MemoryDecision, MemoryDecisionPolicy
 from src.v2.memory.retriever import AnswerMemoryRetriever
+from src.v2.memory.store import ChromaAnswerMemory
+from src.v2.memory.write_policy import MemoryWritePolicy
 
 
 def answer_memory_node(
@@ -20,7 +22,12 @@ def answer_memory_node(
     if decision_policy is None:
         decision_policy = MemoryDecisionPolicy()
 
-    question = state["evaluation_input"].question
+    evaluation_input = state["evaluation_input"]
+
+    if isinstance(evaluation_input, dict):
+        question = evaluation_input["question"]
+    else:
+        question = evaluation_input.question
 
     matches = memory_retriever.search(question)
 
@@ -71,4 +78,100 @@ def answer_memory_node(
         "memory_decision_score": decision.decision_score,
         "memory_answer": None,
         "memory_evidence": [],
+    }
+
+
+def use_memory_reference_node(
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Convert a previously verified memory entry into the standard
+    ReferenceAnswer used by the existing evaluation pipeline.
+
+    This bypasses fresh reference generation and validation.
+    The candidate response is still evaluated normally.
+    """
+
+    matches = state.get("memory_matches", [])
+
+    if not matches:
+        raise ValueError(
+            "Memory hit occurred but no memory match is available."
+        )
+
+    memory = matches[0].memory
+
+    return {
+        "reference_answer": {
+            "answer": memory.answer,
+            "claims": memory.claims,
+            "evidence_refs": memory.evidence_refs,
+            "confidence": memory.validation_confidence,
+        },
+        "evidence": memory.evidence,
+    }
+
+
+def write_verified_answer_node(
+    state: dict[str, Any],
+    *,
+    memory_store: ChromaAnswerMemory,
+    write_policy: MemoryWritePolicy | None = None,
+) -> dict[str, Any]:
+    """
+    Persist a freshly generated reference answer only when the
+    final evaluation satisfies the conservative memory write policy.
+    """
+
+    if write_policy is None:
+        write_policy = MemoryWritePolicy()
+
+    final_verdict = state.get("final_verdict")
+    validation = state.get("reference_validation")
+    reference_answer = state.get("reference_answer")
+    evidence = state.get("evidence", [])
+
+    if final_verdict is None:
+        raise ValueError("Final verdict is required before memory write.")
+
+    if validation is None:
+        raise ValueError(
+            "Reference validation is required before memory write."
+        )
+
+    if reference_answer is None:
+        raise ValueError(
+            "Reference answer is required before memory write."
+        )
+
+    disagreement = final_verdict.disagreement
+
+    unresolved_disagreement = bool(
+        disagreement is not None
+        and disagreement.requires_adjudication
+        and final_verdict.adjudication is None
+    )
+
+    decision = write_policy.evaluate(
+        verdict=final_verdict.verdict,
+        validation_score=validation.score,
+        validation_confidence=validation.confidence,
+        aggregated_confidence=final_verdict.confidence,
+        evidence_count=len(evidence),
+        unresolved_disagreement=unresolved_disagreement,
+    )
+
+    stored_memory = None
+
+    if decision.decision == "store":
+        stored_memory = memory_store.save(
+            question=state["evaluation_input"].question,
+            reference_answer=reference_answer,
+            validation=validation,
+            evidence=evidence,
+        )
+
+    return {
+        "memory_write_decision": decision,
+        "memory_stored": stored_memory is not None,
     }

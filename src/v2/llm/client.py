@@ -1,29 +1,138 @@
 import os
+import threading
+from copy import deepcopy
 
+from dotenv import load_dotenv
+from groq import Groq
 from ollama import Client
 
 
+load_dotenv()
+
+
+GROQ_MAX_CONCURRENT_REQUESTS = int(
+    os.getenv("GROQ_MAX_CONCURRENT_REQUESTS", "2")
+)
+
+GROQ_CONCURRENCY_LIMITER = threading.BoundedSemaphore(
+    GROQ_MAX_CONCURRENT_REQUESTS
+)
+
+
+def make_groq_strict_schema(schema):
+    """Convert a JSON schema to Groq strict structured-output format."""
+
+    schema = deepcopy(schema)
+
+    def process(node):
+        if isinstance(node, dict):
+
+            if node.get("type") == "object":
+                node["additionalProperties"] = False
+
+                properties = node.get("properties", {})
+
+                if properties:
+                    node["required"] = list(properties.keys())
+
+                for value in properties.values():
+                    process(value)
+
+            if node.get("type") == "array":
+                items = node.get("items")
+
+                if items:
+                    process(items)
+
+            for key in ("anyOf", "oneOf", "allOf"):
+                if key in node:
+                    for item in node[key]:
+                        process(item)
+
+        elif isinstance(node, list):
+            for item in node:
+                process(item)
+
+    process(schema)
+
+    return schema
+
+
 class LLMClient:
-    """LLM client abstraction for V2 using Ollama."""
+    """
+    V2 LLM abstraction supporting both Ollama and Groq.
+
+    Ollama remains the default for backward compatibility.
+
+    Groq must be selected explicitly with:
+
+        LLMClient(
+            model="openai/gpt-oss-120b",
+            provider="groq",
+        )
+    """
 
     def __init__(
         self,
         model: str,
         host: str | None = None,
+        provider: str | None = None,
     ):
+        # Keep Ollama as the default so existing V2 unit tests and
+        # legacy callers remain deterministic and offline.
+        self.provider = (
+            provider or "ollama"
+        ).lower()
+
         self.model = model
+
+        # Preserve the legacy host attribute expected by tests/callers.
         self.host = host or os.getenv(
             "OLLAMA_HOST",
             "http://localhost:11434",
         )
-        self.client = Client(host=self.host)
+
+        if self.provider == "ollama":
+            self.client = Client(host=self.host)
+
+        elif self.provider == "groq":
+            self.client = Groq(
+                api_key=os.getenv("GROQ_API_KEY")
+            )
+
+        else:
+            raise ValueError(
+                f"Unsupported LLM provider: {self.provider}"
+            )
 
     def generate(
         self,
         prompt: str,
         response_format: dict,
     ) -> str:
-        """Generate a structured response from the configured LLM."""
+        """Generate a structured response using the selected provider."""
+
+        if self.provider == "ollama":
+            return self._generate_ollama(
+                prompt,
+                response_format,
+            )
+
+        if self.provider == "groq":
+            return self._generate_groq(
+                prompt,
+                response_format,
+            )
+
+        raise ValueError(
+            f"Unsupported LLM provider: {self.provider}"
+        )
+
+    def _generate_ollama(
+        self,
+        prompt: str,
+        response_format: dict,
+    ) -> str:
 
         response = self.client.chat(
             model=self.model,
@@ -37,3 +146,35 @@ class LLMClient:
         )
 
         return response.message.content
+
+    def _generate_groq(
+        self,
+        prompt: str,
+        response_format: dict,
+    ) -> str:
+
+        strict_schema = make_groq_strict_schema(
+            response_format
+        )
+
+        with GROQ_CONCURRENCY_LIMITER:
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "structured_response",
+                        "strict": True,
+                        "schema": strict_schema,
+                    },
+                },
+            )
+
+        return response.choices[0].message.content
