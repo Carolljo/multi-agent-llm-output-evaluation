@@ -1,9 +1,10 @@
 import os
 import threading
+import time
 from copy import deepcopy
 
 from dotenv import load_dotenv
-from groq import Groq
+from groq import APITimeoutError, Groq, RateLimitError
 from ollama import Client
 
 
@@ -16,6 +17,10 @@ GROQ_MAX_CONCURRENT_REQUESTS = int(
 
 GROQ_CONCURRENCY_LIMITER = threading.BoundedSemaphore(
     GROQ_MAX_CONCURRENT_REQUESTS
+)
+
+GROQ_MAX_RETRIES = int(
+    os.getenv("GROQ_MAX_RETRIES", "3")
 )
 
 
@@ -157,24 +162,60 @@ class LLMClient:
             response_format
         )
 
-        with GROQ_CONCURRENCY_LIMITER:
+        last_error = None
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    }
-                ],
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": "structured_response",
-                        "strict": True,
-                        "schema": strict_schema,
-                    },
-                },
-            )
+        for attempt in range(GROQ_MAX_RETRIES + 1):
 
-        return response.choices[0].message.content
+            try:
+                with GROQ_CONCURRENCY_LIMITER:
+
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": prompt,
+                            }
+                        ],
+                        response_format={
+                            "type": "json_schema",
+                            "json_schema": {
+                                "name": "structured_response",
+                                "strict": True,
+                                "schema": strict_schema,
+                            },
+                        },
+                    )
+
+                return response.choices[0].message.content
+
+            except RateLimitError as exc:
+                last_error = exc
+
+                if attempt >= GROQ_MAX_RETRIES:
+                    raise
+
+                retry_after = exc.response.headers.get(
+                    "retry-after"
+                )
+
+                try:
+                    delay = float(retry_after)
+                except (TypeError, ValueError):
+                    delay = 5.0
+
+                time.sleep(delay)
+
+            except APITimeoutError as exc:
+                last_error = exc
+
+                if attempt >= GROQ_MAX_RETRIES:
+                    raise
+
+                # Transient network/API timeout.
+                # Use increasing backoff rather than retrying immediately.
+                delay = 2.0 * (attempt + 1)
+
+                time.sleep(delay)
+
+        raise last_error

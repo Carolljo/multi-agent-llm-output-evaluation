@@ -141,7 +141,18 @@ REFERENCE CLAIMS:
 RETRIEVED EVIDENCE:
 {evidence_text}
 
-For every candidate claim, assign exactly one verdict:
+For every candidate claim, assign exactly one verdict.
+
+IMPORTANT:
+The "verdict" field MUST contain exactly one of these three
+strings and nothing else:
+
+"grounded"
+"partially_grounded"
+"ungrounded"
+
+Do NOT use "partial_grounded", "partially grounded",
+"partial", "unsupported", or any other variation.
 
 - grounded:
   The supplied evidence directly supports the claim.

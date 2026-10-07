@@ -115,6 +115,11 @@ class Adjudicator:
     ) -> str:
         """Build the evidence-grounded adjudication prompt."""
 
+        valid_evidence_ids = [
+            item.evidence_id
+            for item in evidence
+        ]
+
         return f"""
 You are the adjudicator in a multi-agent LLM evaluation system.
 
@@ -139,6 +144,38 @@ Allowed verdicts:
   The response is substantially incorrect, unsupported,
   or unacceptable.
 
+IMPORTANT EVIDENCE REFERENCE RULE:
+
+The "evidence_refs" field MUST contain ONLY actual evidence IDs
+from the supplied EVIDENCE section.
+
+Valid evidence IDs for this case are:
+
+{json.dumps(valid_evidence_ids, indent=2)}
+
+For example, if the supplied evidence IDs are:
+["E1", "E2", "E3"]
+
+then evidence_refs may contain:
+["E1"]
+["E1", "E3"]
+[]
+or another list containing ONLY those exact IDs.
+
+NEVER put evaluator names in evidence_refs.
+
+Do NOT use:
+"accuracy"
+"completeness"
+"logical_consistency"
+"evidence_grounding"
+
+Do NOT use claim IDs, evaluator names, verdict names,
+source names, or any other labels as evidence references.
+
+If no specific evidence directly supports the adjudication,
+return an empty evidence_refs list.
+
 You must:
 
 1. Consider all evaluator results.
@@ -147,9 +184,11 @@ You must:
 3. Examine the relevant claims and supplied evidence.
 4. Use ONLY the supplied evidence.
 5. Do NOT invent evidence references.
-6. Explain why the disagreement should be resolved
+6. Every value in evidence_refs must exactly match an
+   evidence_id from the supplied EVIDENCE section.
+7. Explain why the disagreement should be resolved
    the way you decided.
-7. Return confidence between 0 and 1.
+8. Return confidence between 0 and 1.
 
 Do NOT return a numerical evaluation score.
 The application calculates the final score deterministically.
@@ -184,5 +223,12 @@ EVALUATOR RESULTS:
 DISAGREEMENT:
 {disagreement.model_dump_json(indent=2)}
 
-Return ONLY valid JSON matching the requested schema.
+FINAL OUTPUT REQUIREMENTS:
+
+- Return ONLY valid JSON matching the requested schema.
+- Use exactly one allowed verdict.
+- Put ONLY valid evidence IDs in evidence_refs.
+- Do not put evaluator names in evidence_refs.
+- Do not invent evidence IDs.
+- If there is no directly relevant evidence, use [].
 """.strip()

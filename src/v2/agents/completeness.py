@@ -145,7 +145,18 @@ CANDIDATE CLAIMS:
 RETRIEVED EVIDENCE:
 {evidence_text}
 
-For every reference claim, assign exactly one verdict:
+For every reference claim, assign exactly one verdict.
+
+IMPORTANT:
+The "verdict" field MUST contain exactly one of these three
+strings and nothing else:
+
+"covered"
+"partially_covered"
+"missing"
+
+Do NOT use "partial_covered", "partially covered", "partial",
+or any other variation.
 
 - covered:
   The candidate response clearly communicates the

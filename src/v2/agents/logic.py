@@ -140,7 +140,18 @@ REFERENCE CLAIMS:
 RETRIEVED EVIDENCE:
 {evidence_text}
 
-For every candidate claim, assign exactly one verdict:
+For every candidate claim, assign exactly one verdict.
+
+IMPORTANT:
+The "verdict" field MUST contain exactly one of these three
+strings and nothing else:
+
+"consistent"
+"partially_inconsistent"
+"contradicted"
+
+Do NOT use "partial_inconsistent", "partially inconsistent",
+"partial", "inconsistent", or any other variation.
 
 - consistent:
   The claim does not conflict with the other candidate

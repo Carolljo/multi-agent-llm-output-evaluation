@@ -140,7 +140,19 @@ REFERENCE CLAIMS:
 RETRIEVED EVIDENCE:
 {evidence_text}
 
-For every candidate claim, assign exactly one verdict:
+For every candidate claim, assign exactly one verdict.
+
+IMPORTANT:
+The "verdict" field MUST contain exactly one of these four
+strings and nothing else:
+
+"supported"
+"partially_supported"
+"contradicted"
+"not_verifiable"
+
+Do NOT use "partial_supported", "partially supported",
+"partial", "unsupported", or any other variation.
 
 - supported:
   The claim is directly supported by the reference answer

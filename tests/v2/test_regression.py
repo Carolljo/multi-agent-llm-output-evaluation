@@ -15,6 +15,7 @@ from src.v2.memory.retriever import AnswerMemoryRetriever
 from src.v2.memory.store import ChromaAnswerMemory
 from src.v2.memory.write_policy import MemoryWritePolicy
 from src.v2.models.schemas import EvaluationInput
+from src.v2.rag.embeddings import OllamaEmbeddingModel
 from src.v2.rag.retriever import ChromaRetriever
 from src.v2.reference.generator import ReferenceAnswerGenerator
 from src.v2.reference.validator import ReferenceAnswerValidator
@@ -31,9 +32,11 @@ REQUIRED_EVALUATORS = {
 QUESTION = "What is machine learning?"
 
 RESPONSE = (
-    "Machine learning is a type of artificial intelligence that allows "
-    "computers to learn patterns from data and make predictions without "
-    "being explicitly programmed for every task."
+    "Machine learning is a subset of artificial intelligence in which "
+    "computers learn patterns from data and use those learned patterns "
+    "to make predictions or decisions without being explicitly programmed "
+    "for every task. Common approaches include supervised learning, "
+    "unsupervised learning, and reinforcement learning."
 )
 
 
@@ -128,7 +131,19 @@ def build_workflow(memory_store):
 
         memory_store=memory_store,
 
-        memory_write_policy=MemoryWritePolicy(),
+        # Regression-only policy:
+        # The production MemoryWritePolicy remains strict and is tested
+        # separately. This regression is specifically testing the
+        # MISS -> STORE -> HIT memory lifecycle, so it must not depend
+        # on an LLM-produced ACCEPT verdict.
+        memory_write_policy=MemoryWritePolicy(
+            min_validation_score=0.0,
+            min_validation_confidence=0.0,
+            min_aggregated_confidence=0.0,
+            require_accept_verdict=False,
+            require_evidence=True,
+            reject_unresolved_disagreement=False,
+        ),
     )
 
 
@@ -433,9 +448,14 @@ def main():
     # Dedicated regression memory
     # ---------------------------------------------------------
 
+    embedding_model = OllamaEmbeddingModel(
+        model="nomic-embed-text:latest"
+    )
+
     memory_store = ChromaAnswerMemory(
         persist_directory="data/v2/regression_memory",
         collection_name="final_regression_memory",
+        embedding_model=embedding_model,
     )
 
     workflow = build_workflow(memory_store)
