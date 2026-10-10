@@ -48,8 +48,10 @@ ACCURACY_EVALUATION_FORMAT = {
             },
         },
         "confidence": {
-            "type": "number",
-        },
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+},
         "reasoning": {
             "type": "string",
         },
@@ -175,8 +177,18 @@ RULES:
 3. Do not invent evidence references.
 4. Evidence references must contain only supplied evidence IDs.
 5. Explain the reason for each verdict.
-6. Assign confidence between 0 and 1.
+6. Assign confidence as a JSON NUMBER between 0 and 1.
+   Valid examples: 0.9, 0.95, 1.0, 0.75.
+   Never write numbers as words.
+   Never use formats such as "0. nine" or "zero point nine".
 7. Provide an overall reasoning summary.
+
+OUTPUT REQUIREMENTS:
+- Return the exact JSON structure required by the response schema.
+- The confidence field must contain a numeric value, not a string.
+- Evaluate every candidate claim exactly once.
+- Use only the supplied claim IDs and evidence IDs.
+- Do not include markdown fences or explanatory text outside the JSON.
 """
 
         raw_response = self.llm_client.generate(

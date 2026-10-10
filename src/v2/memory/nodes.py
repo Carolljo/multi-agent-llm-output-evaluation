@@ -4,6 +4,7 @@ from src.v2.memory.decision import MemoryDecision, MemoryDecisionPolicy
 from src.v2.memory.retriever import AnswerMemoryRetriever
 from src.v2.memory.store import ChromaAnswerMemory
 from src.v2.memory.write_policy import MemoryWritePolicy
+from src.v2.models.schemas import Claim, ReferenceAnswer
 
 
 def answer_memory_node(
@@ -85,10 +86,11 @@ def use_memory_reference_node(
     state: dict[str, Any],
 ) -> dict[str, Any]:
     """
-    Convert a previously verified memory entry into the standard
-    ReferenceAnswer used by the existing evaluation pipeline.
+    Convert a verified memory entry into the ReferenceAnswer model
+    expected by the existing V2 evaluation pipeline.
 
-    This bypasses fresh reference generation and validation.
+    Reuses the stored reference answer and evidence without calling
+    the reference generator or validator.
     The candidate response is still evaluated normally.
     """
 
@@ -101,13 +103,24 @@ def use_memory_reference_node(
 
     memory = matches[0].memory
 
+    # Convert stored claim dictionaries into Claim model instances.
+    claims = [
+        claim
+        if isinstance(claim, Claim)
+        else Claim.model_validate(claim)
+        for claim in memory.claims
+    ]
+
+    # Reconstruct the expected ReferenceAnswer model.
+    reference_answer = ReferenceAnswer(
+        answer=memory.answer,
+        claims=claims,
+        evidence_refs=memory.evidence_refs,
+        confidence=memory.validation_confidence,
+    )
+
     return {
-        "reference_answer": {
-            "answer": memory.answer,
-            "claims": memory.claims,
-            "evidence_refs": memory.evidence_refs,
-            "confidence": memory.validation_confidence,
-        },
+        "reference_answer": reference_answer,
         "evidence": memory.evidence,
     }
 

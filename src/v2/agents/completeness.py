@@ -47,8 +47,10 @@ COMPLETENESS_EVALUATION_FORMAT = {
             },
         },
         "confidence": {
-            "type": "number",
-        },
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    },
         "reasoning": {
             "type": "string",
         },
@@ -177,8 +179,17 @@ RULES:
 4. Do not invent candidate claim IDs.
 5. Consider the importance of each reference claim.
 6. Do not judge factual accuracy.
-7. Assign confidence between 0 and 1.
+7. Assign confidence as a JSON NUMBER between 0 and 1.
+   Valid examples: 0.9, 0.95, 1.0, 0.75.
+   Never write numbers as words.
+   Never use formats such as "0. nine" or "zero point nine".
 8. Provide an overall reasoning summary.
+
+OUTPUT REQUIREMENTS:
+- Return the exact JSON structure required by the response schema.
+- The confidence field must contain a numeric value, not a string.
+- Evaluate every reference claim exactly once.
+- Do not include markdown fences or explanatory text outside the JSON.
 """
 
         raw_response = self.llm_client.generate(

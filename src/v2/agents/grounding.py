@@ -46,8 +46,10 @@ EVIDENCE_GROUNDING_EVALUATION_FORMAT = {
                 ],
             },
         },
-        "confidence": {
+             "confidence": {
             "type": "number",
+            "minimum": 0,
+            "maximum": 1,
         },
         "reasoning": {
             "type": "string",
@@ -172,8 +174,17 @@ RULES:
 5. Do not treat the reference answer itself as evidence.
 6. A claim is ungrounded if the supplied evidence does not
    provide sufficient support.
-7. Assign confidence between 0 and 1.
+7. Assign confidence as a JSON NUMBER between 0 and 1.
+   Valid examples: 0.9, 0.95, 1.0, 0.75.
+   Never write numbers as words.
+   Never use formats such as "0. nine" or "zero point nine".
 8. Provide an overall reasoning summary.
+
+OUTPUT REQUIREMENTS:
+- Return the exact JSON structure required by the response schema.
+- The confidence field must contain a numeric value, not a string.
+- Every claim must include claim_id, verdict, evidence_refs, and reasoning.
+- Do not include markdown fences or explanatory text outside the JSON.
 """
 
         raw_response = self.llm_client.generate(

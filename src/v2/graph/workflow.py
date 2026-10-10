@@ -444,10 +444,14 @@ def build_autonomous_workflow(
         "score_evidence_quality",
     )
 
-    graph.add_edge(
-        "score_evidence_quality",
-        "generate_reference",
-    )
+    # With memory enabled, route_after_memory determines whether to
+    # reuse the stored reference or generate a fresh reference.
+    # Without memory, preserve the original fresh-generation path.
+    if memory_retriever is None:
+        graph.add_edge(
+            "score_evidence_quality",
+            "generate_reference",
+        )
 
     graph.add_edge(
         "generate_reference",
