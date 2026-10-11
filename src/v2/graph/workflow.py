@@ -12,6 +12,7 @@ from src.v2.graph.nodes import (
     disagreement_node,
     extract_claims_node,
     finalize_node,
+    generate_candidate_answer_node,
     generate_reference_node,
     grounding_node,
     logic_node,
@@ -31,7 +32,7 @@ from src.v2.memory.store import ChromaAnswerMemory
 from src.v2.memory.write_policy import MemoryWritePolicy
 from src.v2.reference.generator import ReferenceAnswerGenerator
 from src.v2.reference.validator import ReferenceAnswerValidator
-
+from src.v2.answer.generator import CandidateAnswerGenerator
 
 def route_after_memory(state: EvaluationState) -> str:
     """
@@ -172,6 +173,7 @@ def build_autonomous_workflow(
     memory_store: ChromaAnswerMemory | None = None,
     memory_write_policy: MemoryWritePolicy | None = None,
     evidence_quality_scorer: EvidenceQualityScorer | None = None,
+    candidate_generator: CandidateAnswerGenerator | None = None,
 ):
     """
     Build and compile the complete autonomous V2 evaluation workflow.
@@ -196,6 +198,19 @@ def build_autonomous_workflow(
         evidence_quality_scorer = EvidenceQualityScorer()
 
     graph = StateGraph(EvaluationState)
+
+    # =========================================================
+    # CANDIDATE ANSWER GENERATION
+    # =========================================================
+
+    if candidate_generator is not None:
+        graph.add_node(
+            "generate_candidate_answer",
+            lambda state: generate_candidate_answer_node(
+                state,
+                candidate_generator,
+            ),
+        )
 
     # =========================================================
     # MEMORY LAYER
@@ -370,13 +385,23 @@ def build_autonomous_workflow(
     # START → MEMORY
     # =========================================================
 
+    if candidate_generator is not None:
+        # Generate the candidate independently before retrieving or
+        # reusing reference evidence.
+        if memory_retriever is not None:
+            graph.add_edge(START, "generate_candidate_answer")
+            graph.add_edge("generate_candidate_answer", "answer_memory")
+        else:
+            graph.add_edge(START, "generate_candidate_answer")
+            graph.add_edge("generate_candidate_answer", "retrieve_evidence")
+    elif memory_retriever is not None:
+        # Preserve the existing memory-first route for legacy callers.
+        graph.add_edge(START, "answer_memory")
+    else:
+        # Preserve the existing retrieval-first route for legacy callers.
+        graph.add_edge(START, "retrieve_evidence")
+
     if memory_retriever is not None:
-
-        graph.add_edge(
-            START,
-            "answer_memory",
-        )
-
         graph.add_conditional_edges(
             "answer_memory",
             route_after_memory,
@@ -418,21 +443,6 @@ def build_autonomous_workflow(
         graph.add_edge(
             "use_memory_reference",
             "extract_claims",
-        )
-
-    else:
-
-        # -----------------------------------------------------
-        # BACKWARD-COMPATIBLE MODE
-        # -----------------------------------------------------
-        #
-        # If memory is not configured, preserve the original
-        # V2 workflow.
-        # -----------------------------------------------------
-
-        graph.add_edge(
-            START,
-            "retrieve_evidence",
         )
 
     # =========================================================

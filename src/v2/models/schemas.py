@@ -6,8 +6,8 @@ from pydantic import BaseModel, Field
 class EvaluationInput(BaseModel):
     """Input provided by the user to start a V2 evaluation."""
 
-    question: str
-    response: str
+    question: str = Field(min_length=1)
+    response: str | None = None
 
 
 class Evidence(BaseModel):

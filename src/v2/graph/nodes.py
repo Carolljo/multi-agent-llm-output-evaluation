@@ -6,7 +6,7 @@ from src.v2.graph.state import EvaluationState
 from src.v2.models.schemas import FinalVerdict
 from src.v2.reference.generator import ReferenceAnswerGenerator
 from src.v2.reference.validator import ReferenceAnswerValidator
-
+from src.v2.answer.generator import CandidateAnswerGenerator
 
 def retrieve_evidence_node(
     state: EvaluationState,
@@ -30,7 +30,26 @@ def retrieve_evidence_node(
     return {
         "evidence": evidence,
     }
+def generate_candidate_answer_node(
+    state: EvaluationState,
+    candidate_generator: CandidateAnswerGenerator,
+) -> dict:
+    """Generate a candidate answer independently of retrieved evidence."""
 
+    question = state["evaluation_input"].question
+
+    candidate_answer = candidate_generator.generate(
+        question=question,
+    )
+
+    if not candidate_answer or not candidate_answer.strip():
+        raise ValueError(
+            "Candidate answer generation returned an empty answer."
+        )
+
+    return {
+        "candidate_answer": candidate_answer.strip(),
+    }
 
 def generate_reference_node(
     state: EvaluationState,
@@ -84,16 +103,24 @@ def extract_claims_node(
     state: EvaluationState,
     claim_extractor: ClaimExtractor,
 ) -> dict:
-    """Extract candidate claims from the response."""
+    """Extract claims from the generated or user-provided candidate answer."""
 
     reference_answer = state["reference_answer"]
 
     if reference_answer is None:
         raise ValueError("Reference answer is missing.")
 
+    candidate_answer = (
+        state.get("candidate_answer")
+        or state["evaluation_input"].response
+    )
+
+    if not candidate_answer or not candidate_answer.strip():
+        raise ValueError("Candidate answer is missing or empty.")
+
     claims = claim_extractor.extract(
         question=state["evaluation_input"].question,
-        response=state["evaluation_input"].response,
+        response=candidate_answer,
         reference_answer=reference_answer,
         evidence=state["evidence"],
     )
@@ -106,7 +133,6 @@ def extract_claims_node(
     return {
         "claims": claims,
     }
-
 
 def accuracy_node(
     state: EvaluationState,
@@ -264,7 +290,7 @@ def adjudicate_node(
     state: EvaluationState,
     adjudicator: Adjudicator,
 ) -> dict:
-    """Resolve evaluator disagreement using the adjudicator."""
+    """Resolve evaluator disagreement using the evaluated candidate answer."""
 
     disagreement = state["disagreement"]
 
@@ -276,9 +302,17 @@ def adjudicate_node(
     if reference_answer is None:
         raise ValueError("Reference answer is missing.")
 
+    candidate_answer = (
+        state.get("candidate_answer")
+        or state["evaluation_input"].response
+    )
+
+    if not candidate_answer or not candidate_answer.strip():
+        raise ValueError("Candidate answer is missing or empty.")
+
     result = adjudicator.adjudicate(
         question=state["evaluation_input"].question,
-        response=state["evaluation_input"].response,
+        response=candidate_answer,
         reference_answer=reference_answer,
         claims=state["claims"],
         evidence=state["evidence"],

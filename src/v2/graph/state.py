@@ -23,6 +23,9 @@ class EvaluationState(TypedDict):
     # Initial input
     evaluation_input: EvaluationInput
 
+    # Candidate answer
+    candidate_answer: Optional[str]
+
     # Verified answer memory
     memory_matches: list[AnswerMemoryMatch]
     memory_hit: bool

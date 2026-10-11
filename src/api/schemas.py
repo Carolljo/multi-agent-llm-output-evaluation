@@ -13,10 +13,10 @@ from src.v2.models.schemas import (
 
 
 class EvaluationRequest(BaseModel):
-    """Request to evaluate a candidate response using autonomous V2."""
+    """Request to evaluate an answer or generate one autonomously."""
 
     question: str = Field(min_length=1)
-    response: str = Field(min_length=1)
+    response: str | None = None
 
 
 class EvaluationResponse(BaseModel):
