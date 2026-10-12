@@ -1,6 +1,7 @@
 from src.v2.arbitration.adjudicator import Adjudicator
 from src.v2.aggregation.aggregator import aggregate_evaluations
 from src.v2.aggregation.disagreement import detect_disagreement
+from src.v2.aggregation.reliability_gate import apply_reliability_gate
 from src.v2.claims.extractor import ClaimExtractor
 from src.v2.graph.state import EvaluationState
 from src.v2.models.schemas import FinalVerdict
@@ -364,18 +365,28 @@ def finalize_node(state: EvaluationState) -> dict:
         confidence = aggregated.confidence
         evidence_refs = aggregated.evidence_refs
 
-    return {
-        "final_verdict": FinalVerdict(
-            verdict=verdict,
-            score=aggregated.score,
-            confidence=confidence,
-            evaluator_results=aggregated.evaluations,
-            disagreement=disagreement,
-            adjudication=adjudication,
-            key_errors=aggregated.errors,
-            evidence_refs=evidence_refs,
-        )
-    }
+    final_verdict = FinalVerdict(
+        verdict=verdict,
+        score=aggregated.score,
+        confidence=confidence,
+        evaluator_results=aggregated.evaluations,
+        disagreement=disagreement,
+        adjudication=adjudication,
+        key_errors=aggregated.errors,
+        evidence_refs=evidence_refs,
+    )
+
+    gated_verdict = apply_reliability_gate(
+        verdict=final_verdict,
+        reference_validation=state.get("reference_validation"),
+        evaluations=aggregated.evaluations,
+        evidence_count=len(state.get("evidence", [])),
+        unresolved_disagreement=(
+            disagreement.requires_adjudication and adjudication is None
+        ),
+    )
+
+    return {"final_verdict": gated_verdict}
     
 def route_after_answer_memory(state: EvaluationState) -> str:
     """

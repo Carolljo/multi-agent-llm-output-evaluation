@@ -9,6 +9,7 @@ from src.v2.models.schemas import (
     Evidence,
     EvaluatorResult,
     ReferenceAnswer,
+    ReferenceValidation,
 )
 
 
@@ -68,7 +69,15 @@ def build_base_state():
             )
         ],
         "reference_answer": reference_answer,
-        "reference_validation": None,
+        "reference_validation": ReferenceValidation(
+            status="valid",
+            score=0.95,
+            confidence=0.95,
+            supported_claims=["C1"],
+            unsupported_claims=[],
+            missing_information=[],
+            reasoning="The reference answer is fully supported.",
+        ),
         "claims": reference_answer.claims,
         "accuracy": None,
         "completeness": None,
@@ -104,8 +113,8 @@ def build_base_state():
             ),
             EvaluatorResult(
                 evaluator="evidence_grounding",
-                score=0.8,
-                confidence=0.8,
+                score=0.9,
+                confidence=0.9,
                 claims_evaluated=1,
                 errors=[],
                 reasoning="Grounded.",
@@ -128,14 +137,15 @@ def test_workflow_without_disagreement():
 
     result = workflow.invoke(state)
 
-    assert result["aggregated"].score == pytest.approx(0.85)
-    assert result["aggregated"].confidence == pytest.approx(0.85)
+    assert result["aggregated"].score == pytest.approx(0.875)
+    assert result["aggregated"].confidence == pytest.approx(0.875)
 
     assert result["disagreement"].detected is False
     assert result["adjudication"] is None
 
+    # A well-grounded answer with a valid reference should pass the gate.
     assert result["final_verdict"].verdict == "accept"
-    assert result["final_verdict"].score == pytest.approx(0.85)
+    assert result["final_verdict"].score == pytest.approx(0.875)
 
     assert fake_adjudicator.called is False
 
@@ -173,5 +183,5 @@ def test_workflow_with_disagreement():
     # Numerical score remains deterministic.
     assert result["final_verdict"].score == pytest.approx(0.75)
 
-    # Qualitative verdict comes from adjudication.
-    assert result["final_verdict"].verdict == "accept"
+    # The Reliability Gate blocks acceptance because grounding is weak.
+    assert result["final_verdict"].verdict == "partial"

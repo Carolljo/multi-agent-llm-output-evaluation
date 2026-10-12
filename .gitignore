@@ -220,3 +220,7 @@ configs.zip
 
 # V2 ChromaDB vector store
 data/v2/vector_store/
+
+# Regression test ChromaDB runtime data
+data/v2/regression_memory/
+data/v2/regression_memory_smoke/

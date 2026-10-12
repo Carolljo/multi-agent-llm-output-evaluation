@@ -15,7 +15,9 @@ from src.v2.models.schemas import (
     EvaluatorResult,
     FinalVerdict,
     ReferenceAnswer,
+    ReferenceValidation,
 )
+
 
 def build_evaluations():
     return [
@@ -186,7 +188,8 @@ def test_adjudicate_node():
     assert result["adjudication"].verdict == "accept"
     assert result["adjudication"].confidence == 0.92
     assert result["adjudication"].evidence_refs == ["E1"]
-    
+
+
 def test_finalize_node_without_disagreement():
     from src.v2.graph.nodes import finalize_node
 
@@ -222,13 +225,20 @@ def test_finalize_node_without_disagreement():
 def test_finalize_node_with_adjudication():
     from src.v2.graph.nodes import finalize_node
 
-    evaluations = build_evaluations()
+    # Strong grounding is required for the Reliability Gate to allow
+    # an otherwise acceptable verdict.
+    evaluations = [
+        evaluation.model_copy(update={"score": 0.9})
+        if evaluation.evaluator == "evidence_grounding"
+        else evaluation
+        for evaluation in build_evaluations()
+    ]
 
     disagreement = Disagreement(
         detected=True,
-        evaluators=["accuracy", "evidence_grounding"],
-        score_range=0.5,
-        reason="Scores differ significantly.",
+        evaluators=["accuracy", "completeness"],
+        score_range=0.1,
+        reason="Minor evaluator disagreement.",
         requires_adjudication=True,
     )
 
@@ -239,6 +249,27 @@ def test_finalize_node_with_adjudication():
         evidence_refs=["E1"],
     )
 
+    reference_validation = ReferenceValidation(
+        status="valid",
+        score=0.95,
+        confidence=0.95,
+        supported_claims=["claim-1"],
+        unsupported_claims=[],
+        missing_information=[],
+        reasoning="The reference answer is supported by the evidence.",
+    )
+
+    evidence = [
+        Evidence(
+            evidence_id="E1",
+            document_id="DOC1",
+            chunk_id="CH1",
+            content="Supporting evidence for the candidate answer.",
+            source="test",
+            relevance_score=0.95,
+        )
+    ]
+
     state = {
         "evaluations": evaluations,
         "aggregated": aggregate_node(
@@ -246,6 +277,8 @@ def test_finalize_node_with_adjudication():
         )["aggregated"],
         "disagreement": disagreement,
         "adjudication": adjudication,
+        "reference_validation": reference_validation,
+        "evidence": evidence,
     }
 
     result = finalize_node(state)
@@ -254,11 +287,11 @@ def test_finalize_node_with_adjudication():
 
     assert isinstance(final_verdict, FinalVerdict)
 
-    # Verdict comes from adjudication.
+    # The adjudicated verdict passes the Reliability Gate.
     assert final_verdict.verdict == "accept"
 
     # Score remains deterministic from aggregation.
-    assert final_verdict.score == pytest.approx(0.75)
+    assert final_verdict.score == pytest.approx(0.875)
 
     # Confidence comes from adjudication when disagreement exists.
     assert final_verdict.confidence == pytest.approx(0.92)

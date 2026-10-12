@@ -317,8 +317,9 @@ def test_autonomous_workflow_adjudicates_on_disagreement():
     # Numerical score remains deterministic.
     assert result["final_verdict"].score == pytest.approx(0.775)
 
-    # Qualitative verdict comes from adjudication.
-    assert result["final_verdict"].verdict == "accept"
+    # The adjudicator recommends acceptance, but the Reliability Gate
+    # downgrades the final verdict because grounding is below its threshold.
+    assert result["final_verdict"].verdict == "partial"
 
 
 def test_autonomous_workflow_rejects_invalid_reference():
