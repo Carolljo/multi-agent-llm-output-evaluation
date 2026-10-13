@@ -386,14 +386,39 @@ def build_autonomous_workflow(
     # =========================================================
 
     if candidate_generator is not None:
-        # Generate the candidate independently before retrieving or
-        # reusing reference evidence.
+        # Generate a candidate only when the caller did not supply one.
+        # A supplied response goes directly to memory/retrieval and is
+        # preserved by extract_claims_node for evaluation.
+        def route_initial_request(state: EvaluationState) -> str:
+            response = state["evaluation_input"].response
+
+            if response is not None and response.strip():
+                return (
+                    "answer_memory"
+                    if memory_retriever is not None
+                    else "retrieve_evidence"
+                )
+
+            return "generate_candidate_answer"
+
+        initial_routes = {
+            "generate_candidate_answer": "generate_candidate_answer",
+            "retrieve_evidence": "retrieve_evidence",
+        }
         if memory_retriever is not None:
-            graph.add_edge(START, "generate_candidate_answer")
+            initial_routes["answer_memory"] = "answer_memory"
+
+        graph.add_conditional_edges(
+            START,
+            route_initial_request,
+            initial_routes,
+        )
+
+        if memory_retriever is not None:
             graph.add_edge("generate_candidate_answer", "answer_memory")
         else:
-            graph.add_edge(START, "generate_candidate_answer")
             graph.add_edge("generate_candidate_answer", "retrieve_evidence")
+
     elif memory_retriever is not None:
         # Preserve the existing memory-first route for legacy callers.
         graph.add_edge(START, "answer_memory")

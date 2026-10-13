@@ -14,11 +14,13 @@ from src.v2.models.schemas import (
 
 
 class FakeRetriever:
-    def __init__(self):
+    def __init__(self, events=None):
         self.called = False
+        self.events = events if events is not None else []
 
     def search(self, *, query, top_k):
         self.called = True
+        self.events.append("retrieve")
 
         assert query == "How many authentication methods are supported?"
         assert top_k == 5
@@ -32,6 +34,23 @@ class FakeRetriever:
                 source="test-document",
             )
         ]
+
+
+class FakeCandidateGenerator:
+    """Deterministic candidate generator for workflow regression tests."""
+
+    def __init__(self, events):
+        self.events = events
+        self.called = False
+        self.questions = []
+
+    def generate(self, *, question):
+        self.called = True
+        self.events.append("generate")
+        self.questions.append(question)
+
+        assert question == "How many authentication methods are supported?"
+        return "Three authentication methods are supported."
 
 
 class FakeReferenceGenerator:
@@ -371,3 +390,63 @@ def test_autonomous_workflow_rejects_invalid_reference():
     assert completeness.called is False
     assert logic.called is False
     assert grounding.called is False
+
+
+def test_candidate_generation_precedes_retrieval_and_supplies_response():
+    events = []
+
+    (
+        _,
+        reference_generator,
+        reference_validator,
+        claim_extractor,
+        accuracy,
+        completeness,
+        logic,
+        grounding,
+        adjudicator,
+    ) = build_dependencies()
+
+    retriever = FakeRetriever(events=events)
+    candidate_generator = FakeCandidateGenerator(events=events)
+
+    workflow = build_autonomous_workflow(
+        retriever=retriever,
+        reference_generator=reference_generator,
+        reference_validator=reference_validator,
+        claim_extractor=claim_extractor,
+        accuracy_evaluator=accuracy,
+        completeness_evaluator=completeness,
+        logic_evaluator=logic,
+        grounding_evaluator=grounding,
+        adjudicator=adjudicator,
+        candidate_generator=candidate_generator,
+    )
+
+    state = build_initial_state()
+    state["evaluation_input"] = EvaluationInput(
+        question="How many authentication methods are supported?",
+        response=None,
+    )
+
+    result = workflow.invoke(state)
+
+    # Candidate generation must happen before evidence retrieval.
+    assert events.index("generate") < events.index("retrieve")
+
+    # The generator receives the question only, not retrieved evidence.
+    assert candidate_generator.called is True
+    assert candidate_generator.questions == [
+        "How many authentication methods are supported?"
+    ]
+
+    # The generated candidate is retained and used downstream.
+    assert result["candidate_answer"] == (
+        "Three authentication methods are supported."
+    )
+    assert claim_extractor.called is True
+    assert len(result["claims"]) == 1
+    assert len(result["evaluations"]) == 4
+
+    # The workflow still produces a final verdict.
+    assert result["final_verdict"] is not None

@@ -7,6 +7,7 @@ from src.v2.agents.accuracy import AccuracyEvaluator
 from src.v2.agents.completeness import CompletenessEvaluator
 from src.v2.agents.grounding import EvidenceGroundingEvaluator
 from src.v2.agents.logic import LogicalConsistencyEvaluator
+from src.v2.answer.generator import CandidateAnswerGenerator
 from src.v2.arbitration.adjudicator import Adjudicator
 from src.v2.claims.extractor import ClaimExtractor
 from src.v2.graph.workflow import build_autonomous_workflow
@@ -39,6 +40,12 @@ def build_workflow():
     llm_client = LLMClient(
         model=model,
         host=ollama_host,
+    )
+
+    # Generate a candidate answer when the request contains
+    # a question but no user-provided response.
+    candidate_generator = CandidateAnswerGenerator(
+        llm_client
     )
 
     retriever = ChromaRetriever()
@@ -85,6 +92,7 @@ def build_workflow():
         logic_evaluator=logic_evaluator,
         grounding_evaluator=grounding_evaluator,
         adjudicator=adjudicator,
+        candidate_generator=candidate_generator,
     )
 
 
@@ -106,7 +114,7 @@ def health_check():
     response_model=EvaluationResponse,
 )
 def evaluate(request: EvaluationRequest):
-    """Evaluate a candidate response using autonomous V2."""
+    """Evaluate a supplied response or generate one autonomously."""
 
     try:
         result = workflow.invoke(

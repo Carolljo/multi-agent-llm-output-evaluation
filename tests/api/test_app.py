@@ -160,3 +160,63 @@ def test_evaluate_handles_workflow_failure(monkeypatch):
     assert response.json() == {
         "detail": "Evaluation failed."
     }
+def test_evaluate_accepts_question_without_response(monkeypatch):
+    class FakeWorkflow:
+        def invoke(self, state):
+            evaluation_input = state["evaluation_input"]
+
+            assert evaluation_input.question == "What is RAG?"
+            assert evaluation_input.response is None
+
+            evaluation = EvaluatorResult(
+                evaluator="accuracy",
+                score=0.9,
+                confidence=0.9,
+                claims_evaluated=1,
+                errors=[],
+                reasoning="Evaluation completed.",
+                evidence_refs=[],
+            )
+
+            disagreement = Disagreement(
+                detected=False,
+                evaluators=[],
+                score_range=0.0,
+                reason="No disagreement.",
+                requires_adjudication=False,
+            )
+
+            final_verdict = FinalVerdict(
+                verdict="accept",
+                score=0.9,
+                confidence=0.9,
+                evaluator_results=[evaluation],
+                disagreement=disagreement,
+                adjudication=None,
+                key_errors=[],
+                evidence_refs=[],
+            )
+
+            return {
+                "final_verdict": final_verdict,
+                "evidence": [],
+                "reference_answer": None,
+                "reference_validation": None,
+                "claims": [],
+                "evaluations": [evaluation],
+                "disagreement": disagreement,
+                "adjudication": None,
+            }
+
+    monkeypatch.setattr(
+        "src.api.app.workflow",
+        FakeWorkflow(),
+    )
+
+    response = client.post(
+        "/evaluate",
+        json={"question": "What is RAG?"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["final_verdict"]["verdict"] == "accept"
