@@ -1,8 +1,13 @@
+
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from src.v2.models.schemas import Claim, Evidence
+from src.v2.models.schemas import (
+    Claim,
+    Evidence,
+    ReferenceValidation,
+)
 
 
 class VerifiedAnswer(BaseModel):
@@ -19,6 +24,9 @@ class VerifiedAnswer(BaseModel):
     validation_status: Literal["valid"] = "valid"
     validation_score: float = Field(ge=0.0, le=1.0)
     validation_confidence: float = Field(ge=0.0, le=1.0)
+
+    # Full validation record required when reusing verified memory.
+    reference_validation: ReferenceValidation | None = None
 
     created_at: str
     updated_at: str

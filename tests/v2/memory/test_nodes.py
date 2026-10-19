@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from src.v2.memory.nodes import answer_memory_node
-from src.v2.models.schemas import EvaluationInput
+from src.v2.models.schemas import EvaluationInput, ReferenceValidation
 
 
 @dataclass
@@ -10,6 +10,7 @@ class FakeMemory:
     validation_score: float
     validation_confidence: float
     evidence: list
+    reference_validation: ReferenceValidation
 
 
 @dataclass
@@ -40,11 +41,20 @@ def build_match(
     validation_score=0.96,
     validation_confidence=0.95,
 ):
+    reference_validation = ReferenceValidation(
+        status="valid",
+        score=validation_score,
+        confidence=validation_confidence,
+        supported_claims=["C1"],
+        reasoning="The reference is supported by the evidence.",
+    )
+
     memory = FakeMemory(
         answer="Machine learning learns patterns from data.",
         validation_score=validation_score,
         validation_confidence=validation_confidence,
         evidence=["evidence-1", "evidence-2"],
+        reference_validation=reference_validation,
     )
 
     return FakeMatch(
@@ -54,9 +64,7 @@ def build_match(
 
 
 def test_strong_memory_is_selected():
-    retriever = FakeMemoryRetriever(
-        [build_match()]
-    )
+    retriever = FakeMemoryRetriever([build_match()])
 
     result = answer_memory_node(
         build_state(),
@@ -90,11 +98,7 @@ def test_no_memory_forces_fresh_retrieval():
 
 def test_weak_memory_forces_fresh_retrieval():
     retriever = FakeMemoryRetriever(
-        [
-            build_match(
-                similarity=0.70,
-            )
-        ]
+        [build_match(similarity=0.70)]
     )
 
     result = answer_memory_node(
@@ -109,11 +113,7 @@ def test_weak_memory_forces_fresh_retrieval():
 
 def test_low_validation_score_forces_fresh_retrieval():
     retriever = FakeMemoryRetriever(
-        [
-            build_match(
-                validation_score=0.60,
-            )
-        ]
+        [build_match(validation_score=0.60)]
     )
 
     result = answer_memory_node(
@@ -127,11 +127,7 @@ def test_low_validation_score_forces_fresh_retrieval():
 
 def test_low_validation_confidence_forces_fresh_retrieval():
     retriever = FakeMemoryRetriever(
-        [
-            build_match(
-                validation_confidence=0.60,
-            )
-        ]
+        [build_match(validation_confidence=0.60)]
     )
 
     result = answer_memory_node(

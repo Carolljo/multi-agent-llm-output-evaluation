@@ -1,3 +1,4 @@
+
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -6,7 +7,12 @@ from typing import Any
 
 import chromadb
 
-from src.v2.models.schemas import Claim, Evidence, ReferenceAnswer, ReferenceValidation
+from src.v2.models.schemas import (
+    Claim,
+    Evidence,
+    ReferenceAnswer,
+    ReferenceValidation,
+)
 from src.v2.memory.schemas import VerifiedAnswer
 
 
@@ -23,7 +29,10 @@ class ChromaAnswerMemory:
         self.client = chromadb.PersistentClient(path=persist_directory)
         self.collection = self.client.get_or_create_collection(
             name=collection_name,
-            metadata={"purpose": "verified_reference_answers", "hnsw:space": "cosine"},
+            metadata={
+                "purpose": "verified_reference_answers",
+                "hnsw:space": "cosine",
+            },
         )
         self.embedding_model = embedding_model
 
@@ -35,7 +44,9 @@ class ChromaAnswerMemory:
 
     def _embed(self, text: str) -> list[float]:
         if self.embedding_model is None:
-            raise ValueError("An embedding_model is required for answer memory.")
+            raise ValueError(
+                "An embedding_model is required for answer memory."
+            )
         return self.embedding_model.embed(text)
 
     def save(
@@ -49,17 +60,26 @@ class ChromaAnswerMemory:
         """Persist a reference answer only after independent validation succeeds."""
 
         if validation.status != "valid":
-            raise ValueError("Only valid reference answers may be stored in memory.")
+            raise ValueError(
+                "Only valid reference answers may be stored in memory."
+            )
 
         now = datetime.now(timezone.utc).isoformat()
         memory_id = self.make_memory_id(question)
 
-        existing = self.collection.get(ids=[memory_id], include=["metadatas"])
+        existing = self.collection.get(
+            ids=[memory_id],
+            include=["metadatas"],
+        )
+
         previous_version = 0
+        existing_metadata = {}
+
         if existing.get("metadatas"):
-            metadata = existing["metadatas"][0]
-            if metadata:
-                previous_version = int(metadata.get("version", 0))
+            existing_metadata = existing["metadatas"][0] or {}
+            previous_version = int(
+                existing_metadata.get("version", 0)
+            )
 
         memory = VerifiedAnswer(
             memory_id=memory_id,
@@ -67,15 +87,14 @@ class ChromaAnswerMemory:
             answer=reference_answer.answer,
             claims=reference_answer.claims,
             evidence_refs=reference_answer.evidence_refs,
-            source_documents=sorted({item.document_id for item in evidence}),
+            source_documents=sorted(
+                {item.document_id for item in evidence}
+            ),
             evidence=evidence,
             validation_score=validation.score,
             validation_confidence=validation.confidence,
-            created_at=(
-                existing.get("metadatas", [{}])[0].get("created_at", now)
-                if existing.get("metadatas") and existing["metadatas"][0]
-                else now
-            ),
+            reference_validation=validation,
+            created_at=existing_metadata.get("created_at", now),
             updated_at=now,
             version=previous_version + 1,
         )
@@ -86,6 +105,7 @@ class ChromaAnswerMemory:
             embeddings=[self._embed(question)],
             metadatas=[self._to_metadata(memory)],
         )
+
         return memory
 
     def search(
@@ -99,15 +119,19 @@ class ChromaAnswerMemory:
 
         if top_k < 1:
             raise ValueError("top_k must be at least 1")
-        if not 0.0 <= min_similarity <= 1.0:
-            raise ValueError("min_similarity must be between 0 and 1")
 
-        if self.collection.count() == 0:
+        if not 0.0 <= min_similarity <= 1.0:
+            raise ValueError(
+                "min_similarity must be between 0 and 1"
+            )
+
+        collection_count = self.collection.count()
+        if collection_count == 0:
             return []
 
         result: dict[str, Any] = self.collection.query(
             query_embeddings=[self._embed(question)],
-            n_results=min(top_k, self.collection.count()),
+            n_results=min(top_k, collection_count),
             where={"validation_status": "valid"},
         )
 
@@ -116,9 +140,16 @@ class ChromaAnswerMemory:
         distances = result.get("distances", [[]])[0]
 
         matches: list[tuple[VerifiedAnswer, float]] = []
+
         for index, memory_id in enumerate(ids):
             metadata = metadatas[index] or {}
-            distance = distances[index] if index < len(distances) else None
+
+            distance = (
+                distances[index]
+                if index < len(distances)
+                else None
+            )
+
             similarity = (
                 max(0.0, min(1.0, 1.0 - float(distance)))
                 if distance is not None
@@ -128,41 +159,87 @@ class ChromaAnswerMemory:
             if similarity < min_similarity:
                 continue
 
-            matches.append((self._from_metadata(memory_id, metadata), similarity))
+            matches.append(
+                (
+                    self._from_metadata(memory_id, metadata),
+                    similarity,
+                )
+            )
 
         return matches
 
     @staticmethod
-    def _to_metadata(memory: VerifiedAnswer) -> dict[str, str | int]:
+    def _to_metadata(
+        memory: VerifiedAnswer,
+    ) -> dict[str, str | int]:
         return {
             "question": memory.question,
             "answer": memory.answer,
-            "claims": json.dumps([claim.model_dump() for claim in memory.claims]),
+            "claims": json.dumps(
+                [claim.model_dump() for claim in memory.claims]
+            ),
             "evidence_refs": json.dumps(memory.evidence_refs),
             "source_documents": json.dumps(memory.source_documents),
-            "evidence": json.dumps([item.model_dump() for item in memory.evidence]),
+            "evidence": json.dumps(
+                [item.model_dump() for item in memory.evidence]
+            ),
             "validation_status": memory.validation_status,
             "validation_score": str(memory.validation_score),
-            "validation_confidence": str(memory.validation_confidence),
+            "validation_confidence": str(
+                memory.validation_confidence
+            ),
+            "reference_validation": (
+                memory.reference_validation.model_dump_json()
+                if memory.reference_validation is not None
+                else ""
+            ),
             "created_at": memory.created_at,
             "updated_at": memory.updated_at,
             "version": memory.version,
         }
 
     @staticmethod
-    def _from_metadata(memory_id: str, metadata: dict[str, Any]) -> VerifiedAnswer:
+    def _from_metadata(
+        memory_id: str,
+        metadata: dict[str, Any],
+    ) -> VerifiedAnswer:
+        serialized_validation = metadata.get(
+            "reference_validation",
+            "",
+        )
+
+        reference_validation = (
+            ReferenceValidation.model_validate_json(
+                serialized_validation
+            )
+            if serialized_validation
+            else None
+        )
+
         return VerifiedAnswer(
             memory_id=memory_id,
             question=metadata["question"],
             answer=metadata["answer"],
-            claims=[Claim.model_validate(item) for item in json.loads(metadata["claims"])],
+            claims=[
+                Claim.model_validate(item)
+                for item in json.loads(metadata["claims"])
+            ],
             evidence_refs=json.loads(metadata["evidence_refs"]),
-            source_documents=json.loads(metadata["source_documents"]),
-            evidence=[Evidence.model_validate(item) for item in json.loads(metadata["evidence"])],
+            source_documents=json.loads(
+                metadata["source_documents"]
+            ),
+            evidence=[
+                Evidence.model_validate(item)
+                for item in json.loads(metadata["evidence"])
+            ],
             validation_status="valid",
             validation_score=float(metadata["validation_score"]),
-            validation_confidence=float(metadata["validation_confidence"]),
+            validation_confidence=float(
+                metadata["validation_confidence"]
+            ),
+            reference_validation=reference_validation,
             created_at=metadata["created_at"],
             updated_at=metadata["updated_at"],
             version=int(metadata["version"]),
         )
+

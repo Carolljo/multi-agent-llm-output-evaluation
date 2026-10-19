@@ -49,6 +49,26 @@ def route_after_memory(state: EvaluationState) -> str:
     return "fresh_retrieval"
 
 
+def route_after_evidence_quality(state: EvaluationState) -> str:
+    """Route based on evidence source and quality."""
+
+    # Freshly retrieved evidence proceeds to reference generation.
+    if state.get("evidence_source") != "memory":
+        return "generate_reference"
+
+    evidence_quality = state.get("evidence_quality", [])
+
+    # Reuse the stored answer only when all cached evidence is high quality.
+    if evidence_quality and all(
+        item.quality_level == "high"
+        for item in evidence_quality
+    ):
+        return "use_memory"
+
+    # Cached evidence failed the quality check; retrieve fresh evidence.
+    return "retrieve_fresh_evidence"
+
+
 def use_memory_evidence_node(
     state: EvaluationState,
 ):
@@ -68,6 +88,7 @@ def use_memory_evidence_node(
 
     return {
         "evidence": memory_evidence,
+        "evidence_source": "memory",
     }
 
 
@@ -458,10 +479,11 @@ def build_autonomous_workflow(
 
         graph.add_conditional_edges(
             "score_evidence_quality",
-            route_after_memory,
+            route_after_evidence_quality,
             {
                 "use_memory": "use_memory_reference",
-                "fresh_retrieval": "generate_reference",
+                "retrieve_fresh_evidence": "retrieve_evidence",
+                "generate_reference": "generate_reference",
             },
         )
 

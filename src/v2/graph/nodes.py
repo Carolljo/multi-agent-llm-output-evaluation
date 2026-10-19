@@ -14,7 +14,7 @@ def retrieve_evidence_node(
     retriever,
     top_k: int = 5,
 ) -> dict:
-    """Retrieve evidence relevant to the evaluation question."""
+    """Retrieve fresh evidence relevant to the evaluation question."""
 
     question = state["evaluation_input"].question
 
@@ -30,6 +30,7 @@ def retrieve_evidence_node(
 
     return {
         "evidence": evidence,
+        "evidence_source": "retrieved",
     }
 def generate_candidate_answer_node(
     state: EvaluationState,

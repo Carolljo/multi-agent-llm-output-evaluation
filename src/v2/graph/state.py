@@ -37,10 +37,14 @@ class EvaluationState(TypedDict):
     memory_decision_score: Optional[float]
     memory_answer: Optional[str]
     memory_evidence: list[Evidence]
+    memory_evidence_rejected: bool
+
+    # Evidence source tracking
+    evidence_source: Optional[str]
 
     # RAG layer
     evidence: list[Evidence]
-    
+
     # Evidence quality
     evidence_quality: list[EvidenceQuality]
 
@@ -69,3 +73,4 @@ class EvaluationState(TypedDict):
 
     # Final output
     final_verdict: Optional[FinalVerdict]
+

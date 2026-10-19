@@ -15,9 +15,10 @@ def answer_memory_node(
 ) -> dict[str, Any]:
     """
     Search verified answer memory and decide whether the best
-    candidate is strong enough to be reused.
+    candidate is safe to reuse.
 
-    This node does not generate an answer and does not call an LLM.
+    Entries without complete reference validation are rejected.
+    This node does not generate answers or call an LLM.
     """
 
     if decision_policy is None:
@@ -49,12 +50,33 @@ def answer_memory_node(
         }
 
     best_match = matches[0]
+    memory = best_match.memory
 
     decision: MemoryDecision = decision_policy.evaluate(best_match)
 
-    if decision.decision == "use_memory":
-        memory = best_match.memory
+    # Legacy memory records may contain validation scores but not the
+    # complete ReferenceValidation object. They must not bypass the gate.
+    reference_validation = getattr(memory, "reference_validation", None)
 
+    if decision.decision == "use_memory" and reference_validation is None:
+        return {
+            "memory_matches": matches,
+            "memory_hit": False,
+            "memory_decision": decision,
+            "memory_decision_reason": (
+                "The memory candidate passed the similarity policy, "
+                "but its complete reference validation is unavailable. "
+                "Fresh evidence retrieval and reference validation are required."
+            ),
+            "memory_similarity": decision.similarity,
+            "memory_validation_score": decision.validation_score,
+            "memory_validation_confidence": decision.validation_confidence,
+            "memory_decision_score": decision.decision_score,
+            "memory_answer": None,
+            "memory_evidence": [],
+        }
+
+    if decision.decision == "use_memory":
         return {
             "memory_matches": matches,
             "memory_hit": True,
@@ -89,10 +111,16 @@ def use_memory_reference_node(
     Convert a verified memory entry into the ReferenceAnswer model
     expected by the existing V2 evaluation pipeline.
 
-    Reuses the stored reference answer and evidence without calling
-    the reference generator or validator.
+    Reuses the stored reference answer, complete reference validation,
+    and evidence without calling the reference generator or validator.
+
     The candidate response is still evaluated normally.
     """
+
+    if not state.get("memory_hit", False):
+        raise ValueError(
+            "Cannot reuse a memory reference when memory_hit is false."
+        )
 
     matches = state.get("memory_matches", [])
 
@@ -103,7 +131,21 @@ def use_memory_reference_node(
 
     memory = matches[0].memory
 
-    # Convert stored claim dictionaries into Claim model instances.
+    reference_validation = getattr(memory, "reference_validation", None)
+
+    if reference_validation is None:
+        raise ValueError(
+            "Stored memory has no complete reference validation. "
+            "Fresh reference generation and validation are required."
+        )
+
+    if reference_validation.status != "valid":
+        raise ValueError(
+            "Stored reference validation is not valid. "
+            "The memory entry cannot be reused."
+        )
+
+    # Convert stored claims into Claim model instances when necessary.
     claims = [
         claim
         if isinstance(claim, Claim)
@@ -111,7 +153,7 @@ def use_memory_reference_node(
         for claim in memory.claims
     ]
 
-    # Reconstruct the expected ReferenceAnswer model.
+    # Reconstruct the reference answer expected by the V2 pipeline.
     reference_answer = ReferenceAnswer(
         answer=memory.answer,
         claims=claims,
@@ -121,6 +163,7 @@ def use_memory_reference_node(
 
     return {
         "reference_answer": reference_answer,
+        "reference_validation": reference_validation,
         "evidence": memory.evidence,
     }
 
@@ -177,8 +220,16 @@ def write_verified_answer_node(
     stored_memory = None
 
     if decision.decision == "store":
+        evaluation_input = state["evaluation_input"]
+
+        question = (
+            evaluation_input["question"]
+            if isinstance(evaluation_input, dict)
+            else evaluation_input.question
+        )
+
         stored_memory = memory_store.save(
-            question=state["evaluation_input"].question,
+            question=question,
             reference_answer=reference_answer,
             validation=validation,
             evidence=evidence,
